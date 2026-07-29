@@ -7,7 +7,13 @@ param environmentName string
 param location string = resourceGroup().location
 
 @description('Azure OpenAI model deployment name.')
-param openAiModelName string = 'gpt-4o'
+param openAiModelName string = 'gpt-5-mini'
+
+@description('Azure OpenAI model version. Must be a non-deprecated version available in the target region.')
+param openAiModelVersion string = '2025-08-07'
+
+@description('Azure OpenAI deployment SKU. GA models in most regions require GlobalStandard.')
+param openAiSkuName string = 'GlobalStandard'
 
 var tags = {
   environment: environmentName
@@ -68,14 +74,14 @@ resource openAiDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024
   parent: cognitiveAccount
   name: openAiModelName
   sku: {
-    name: 'Standard'
+    name: openAiSkuName
     capacity: 30
   }
   properties: {
     model: {
       format: 'OpenAI'
       name: openAiModelName
-      version: '2024-08-06'
+      version: openAiModelVersion
     }
   }
 }
@@ -95,7 +101,8 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enableRbacAuthorization: true
     enableSoftDelete: true
     softDeleteRetentionInDays: 7
-    enablePurgeProtection: false
+    // Required by tenant policy; irreversible once enabled.
+    enablePurgeProtection: true
     publicNetworkAccess: 'Enabled'
   }
 }

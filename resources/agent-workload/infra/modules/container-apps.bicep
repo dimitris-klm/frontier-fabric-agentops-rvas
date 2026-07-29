@@ -112,7 +112,8 @@ resource frontendApp 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        minReplicas: 1
+        // 0 avoids a first-provision health-gate deadlock on the placeholder image; scales up on demand
+        minReplicas: 0
         maxReplicas: 10
         rules: [
           {
@@ -186,7 +187,8 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        minReplicas: 1
+        // 0 avoids a first-provision health-gate deadlock on the placeholder image; scales up on demand
+        minReplicas: 0
         maxReplicas: 10
         rules: [
           {
@@ -260,7 +262,8 @@ resource agentApp 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        minReplicas: 1
+        // 0 avoids a first-provision health-gate deadlock on the placeholder image; scales up on demand
+        minReplicas: 0
         maxReplicas: 10
         rules: [
           {
