@@ -175,26 +175,6 @@ resource keyVaultRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04
   }
 }
 
-// ACR Pull – allows managed identity to pull container images
-// Use deterministic name matching the container-apps module to avoid BCP120
-var containerRegistryName = replace('${environmentName}acr', '-', '')
-var acrPullRoleDefinitionId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-
-resource containerRegistryRef 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
-  name: containerRegistryName
-}
-
-resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(containerRegistryName, managedIdentity.id, acrPullRoleDefinitionId)
-  scope: containerRegistryRef
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleDefinitionId)
-    principalId: managedIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
-  }
-  dependsOn: [containerApps]
-}
-
 // Cognitive Services OpenAI User – allows managed identity to call OpenAI
 var cognitiveServicesOpenAiUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 
