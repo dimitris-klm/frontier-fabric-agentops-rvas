@@ -106,8 +106,8 @@ assignments). Identify at least one person who has the rights to create role ass
 </ul>
 <h3 id="2-confirm-your-firepower-foundry-model-quota">2. Confirm your firepower (Foundry model quota)<a class="anchor" href="#2-confirm-your-firepower-foundry-model-quota" aria-hidden="true">#</a></h3>
 <ul>
-<li>Confirm access to <strong>Azure AI Foundry / Azure OpenAI</strong> and locate <strong>quota</strong> for <code>gpt-4o</code> or
-<code>gpt-4o-mini</code>.</li>
+<li>Confirm access to <strong>Azure AI Foundry / Azure OpenAI</strong> and locate <strong>quota</strong> for <code>gpt-5-mini</code>, the
+model used by the reference workload.</li>
 <li>Pick a <strong>region</strong> that offers both the model and Microsoft Fabric, and agree on it as a team —
 you&#39;ll deploy everything there.</li>
 </ul>
@@ -121,7 +121,8 @@ capacity. Note the <strong>capacity name/ID</strong>.</li>
 </ul>
 <h3 id="4-arm-the-team-tooling-get-the-code">4. Arm the team (tooling) &amp; get the code<a class="anchor" href="#4-arm-the-team-tooling-get-the-code" aria-hidden="true">#</a></h3>
 <ul>
-<li>Install and verify the local tools (<code>az</code>, <code>azd</code>, <code>python</code>, <code>node</code>, <code>docker</code>, <code>git</code>).</li>
+<li>Install and verify the local tools (<code>az</code>, <code>azd</code>, <code>python</code>, <code>node</code>, <code>docker</code>, <code>git</code>). Start Docker
+Desktop (or another compatible container runtime) and confirm its engine is running.</li>
 <li>Clone this repo and take a 5-minute tour of <code>resources/</code> — note where the agent workload, landing
 zone, and Fabric assets live. You&#39;ll come back to each.</li>
 </ul>
@@ -137,10 +138,10 @@ zone, and Fabric assets live. You&#39;ll come back to each.</li>
 <ul>
 <li><input disabled="" type="checkbox"> Every team member can <code>az login</code> and select the target subscription</li>
 <li><input disabled="" type="checkbox"> Roles confirmed: Contributor (+ someone with role-assignment rights), Cost Management Reader</li>
-<li><input disabled="" type="checkbox"> Foundry model quota confirmed for <code>gpt-4o</code>/<code>gpt-4o-mini</code> in your chosen region</li>
+<li><input disabled="" type="checkbox"> Foundry model quota confirmed for <code>gpt-5-mini</code> in your chosen region</li>
 <li><input disabled="" type="checkbox"> A Fabric capacity is active and you know its ID/name</li>
 <li><input disabled="" type="checkbox"> A team <strong>Fabric workspace</strong> exists, assigned to the capacity, reachable by all members</li>
-<li><input disabled="" type="checkbox"> Local tooling installed and verified (<code>az version</code>, <code>azd version</code>, <code>python --version</code>, <code>docker --version</code>)</li>
+<li><input disabled="" type="checkbox"> Local tooling installed and verified (<code>az version</code>, <code>azd version</code>, <code>python --version</code>, <code>docker info</code>)</li>
 <li><input disabled="" type="checkbox"> Repo cloned; team has located the four <code>resources/</code> components</li>
 <li><input disabled="" type="checkbox"> Your &quot;coordinates&quot; (subscription, region, capacity, workspace) are written down</li>
 </ul>
@@ -182,7 +183,8 @@ az role assignment list --assignee &quot;$(az account show --query user.name -o 
 <summary>Checking Foundry / OpenAI quota</summary>
 
 <p>In the <strong>Azure AI Foundry portal → Management → Quotas</strong>, filter to your region and confirm available
-TPM for <code>gpt-4o-mini</code> (recommended) or <code>gpt-4o</code>. ~30K TPM per team is plenty.</p>
+TPM for <code>gpt-5-mini</code>. The reference deployment requests 30K TPM; confirm that capacity is available
+in the team&#39;s chosen region.</p>
 </details>
 
 <h2 id="resources">Resources<a class="anchor" href="#resources" aria-hidden="true">#</a></h2>
