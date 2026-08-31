@@ -11,6 +11,7 @@ param tags object = {}
 param logAnalyticsWorkspaceId string
 
 @description('Application Insights connection string.')
+@secure()
 param applicationInsightsConnectionString string
 
 @description('Cosmos DB endpoint URL.')

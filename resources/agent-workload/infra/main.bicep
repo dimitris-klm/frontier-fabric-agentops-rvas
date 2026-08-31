@@ -196,6 +196,7 @@ output AZURE_COSMOS_DB_ENDPOINT string = cosmosDb.outputs.cosmosDbEndpoint
 output AZURE_KEY_VAULT_NAME string = keyVault.name
 output AZURE_OPENAI_ENDPOINT string = cognitiveAccount.properties.endpoint
 output AZURE_OPENAI_DEPLOYMENT string = openAiModelName
+@secure()
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.applicationInsightsConnectionString
 output APPLICATIONINSIGHTS_NAME string = monitoring.outputs.applicationInsightsName
 output AZURE_APIM_GATEWAY_URL string = apiManagement.outputs.apimGatewayUrl
