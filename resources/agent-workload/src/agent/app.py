@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
-AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-5-mini")
 APPLICATIONINSIGHTS_CONNECTION_STRING = os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
 AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID", "")
 
@@ -70,7 +70,7 @@ def _get_openai_client() -> AzureOpenAI:
     return AzureOpenAI(
         azure_endpoint=AZURE_OPENAI_ENDPOINT,
         api_key=token.token,
-        api_version="2024-10-21",
+        api_version="2025-04-01-preview",
     )
 
 

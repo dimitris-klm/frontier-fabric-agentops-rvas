@@ -92,14 +92,14 @@ conversation data the Control Tower later correlates.</p>
 </blockquote>
 <hr>
 <h2 id="architecture-overview">Architecture Overview<a class="anchor" href="#architecture-overview" aria-hidden="true">#</a></h2>
-<p>The <strong>Agents Runtime</strong> is the core execution block of the observability platform. It orchestrates user interactions through a gateway, processes requests across three microservices, persists data, and emits telemetry at every layer.</p>
+<p>The <strong>Agents Runtime</strong> is the core execution block of the observability platform. It processes requests across three microservices, persists data, and emits telemetry at every layer.</p>
 <div class="table-wrap"><table><thead><tr>
 <th>Component</th>
 <th>Role</th>
 </tr>
 </thead><tbody><tr>
 <td><strong>Azure AI Foundry</strong></td>
-<td>Provides the AI model endpoint (GPT-4o / GPT-4o-mini) for agent inference via managed deployments.</td>
+<td>Provides the <code>gpt-5-mini</code> model endpoint for agent inference via a managed deployment.</td>
 </tr>
 <tr>
 <td><strong>Azure Container Apps</strong></td>
@@ -107,7 +107,7 @@ conversation data the Control Tower later correlates.</p>
 </tr>
 <tr>
 <td><strong>Azure API Management</strong></td>
-<td>Unified API gateway with PTU-aware load balancing, rate limiting, and centralized analytics.</td>
+<td>Provisions API definitions and policies for future gateway integration; it is not in the reference application&#39;s active request path.</td>
 </tr>
 <tr>
 <td><strong>Azure Cosmos DB</strong></td>
@@ -119,37 +119,13 @@ conversation data the Control Tower later correlates.</p>
 </tr>
 </tbody></table></div>
 <h3 id="architecture-diagram">Architecture Diagram<a class="anchor" href="#architecture-diagram" aria-hidden="true">#</a></h3>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>┌──────────┐
-│   User   │
-└────┬─────┘
-     │ HTTPS
-     ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    API Management Gateway                    │
-│            (PTU load balancing · rate limiting)               │
-└────┬─────────────────┬──────────────────┬────────────────────┘
-     │                 │                  │
-     ▼                 ▼                  ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Container Apps Environment                      │
-│                                                              │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐ │
-│  │  Frontend   │  │   Backend    │  │       Agent          │ │
-│  │  (Next.js)  │  │  (FastAPI)   │  │     (FastAPI)        │ │
-│  │  Port 3000  │  │  Port 8000   │  │     Port 8001        │ │
-│  └─────────────┘  └──────┬───────┘  └──────────┬──────────┘ │
-│                          │                      │            │
-│                          ▼                      ▼            │
-│                   ┌────────────┐       ┌─────────────────┐   │
-│                   │ Cosmos DB  │       │ Azure AI Foundry │   │
-│                   │ (agentsdb) │       │  (GPT-4o model)  │   │
-│                   └────────────┘       └─────────────────┘   │
-│                                                              │
-│         ┌──────────────────────────────────┐                 │
-│         │      Application Insights        │                 │
-│         │  (traces · metrics · logs · map) │                 │
-│         └──────────────────────────────────┘                 │
-└──────────────────────────────────────────────────────────────┘</code></pre>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-text">User → Frontend (Next.js) → Backend (FastAPI) → Agent (FastAPI) → Azure AI Foundry
+                │
+                └→ Cosmos DB (agentsdb)
+
+Frontend + Backend + Agent → Application Insights
+
+API Management is provisioned for future gateway integration but is not in this active path.</code></pre>
 <hr>
 <h2 id="prerequisites">Prerequisites<a class="anchor" href="#prerequisites" aria-hidden="true">#</a></h2>
 <div class="table-wrap"><table><thead><tr>
@@ -198,6 +174,10 @@ azd init
 
 # Provision infrastructure and deploy all services
 azd up</code></pre>
+<p>Docker must be running. <code>azd up</code> is the normal path when containers can download packages from npm
+and PyPI. If a restricted network blocks local container package downloads, run <code>azd provision</code>,
+build the <code>agent</code>, <code>backend</code>, and <code>frontend</code> images with <code>az acr build</code>, and attach them with
+<code>az containerapp update</code>. See the Challenge 1 coach guide for the exact fallback commands.</p>
 <p>After deployment completes, <code>azd</code> prints the service URLs:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>  frontend  https://frontend.&lt;env&gt;.&lt;region&gt;.azurecontainerapps.io
   backend   https://backend.&lt;env&gt;.&lt;region&gt;.azurecontainerapps.io
@@ -334,17 +314,12 @@ Content-Type: application/json
 }</code></pre>
 <p><strong>Response</strong> <code>200 OK</code></p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-json">{
-  &quot;message&quot;: {
-    &quot;role&quot;: &quot;assistant&quot;,
-    &quot;content&quot;: &quot;Azure Container Apps is a serverless container platform...&quot;
-  },
+  &quot;response&quot;: &quot;Azure Container Apps is a serverless container platform...&quot;,
   &quot;usage&quot;: {
     &quot;prompt_tokens&quot;: 64,
-    &quot;completion_tokens&quot;: 200,
-    &quot;total_tokens&quot;: 264
+    &quot;completion_tokens&quot;: 200
   },
-  &quot;model&quot;: &quot;gpt-4o&quot;,
-  &quot;duration_ms&quot;: 1523
+  &quot;model&quot;: &quot;gpt-5-mini&quot;
 }</code></pre>
 <h4 id="invoke-agent-streaming">Invoke Agent (Streaming)</h4>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-http">POST /api/agent/stream
@@ -368,7 +343,7 @@ data: {&quot;type&quot;: &quot;done&quot;, &quot;usage&quot;: {&quot;prompt_toke
 <h4 id="health-check-agent">Health Check (Agent)</h4>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-http">GET /api/health</code></pre>
 <p><strong>Response</strong> <code>200 OK</code></p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-json">{ &quot;status&quot;: &quot;healthy&quot;, &quot;service&quot;: &quot;agent&quot;, &quot;version&quot;: &quot;1.0.0&quot; }</code></pre>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-json">{ &quot;status&quot;: &quot;healthy&quot;, &quot;service&quot;: &quot;agent&quot; }</code></pre>
 <hr>
 <h2 id="environment-variables">Environment Variables<a class="anchor" href="#environment-variables" aria-hidden="true">#</a></h2>
 <h3 id="backend-service">Backend Service<a class="anchor" href="#backend-service" aria-hidden="true">#</a></h3>
@@ -378,14 +353,14 @@ data: {&quot;type&quot;: &quot;done&quot;, &quot;usage&quot;: {&quot;prompt_toke
 <th>Required</th>
 </tr>
 </thead><tbody><tr>
-<td><code>COSMOS_ENDPOINT</code></td>
+<td><code>COSMOS_DB_ENDPOINT</code></td>
 <td>Azure Cosmos DB account endpoint URL</td>
 <td>Yes</td>
 </tr>
 <tr>
 <td><code>COSMOS_DATABASE</code></td>
 <td>Cosmos DB database name (default: <code>agentsdb</code>)</td>
-<td>Yes</td>
+<td>No</td>
 </tr>
 <tr>
 <td><code>AGENT_SERVICE_URL</code></td>
@@ -421,13 +396,8 @@ data: {&quot;type&quot;: &quot;done&quot;, &quot;usage&quot;: {&quot;prompt_toke
 </tr>
 <tr>
 <td><code>AZURE_OPENAI_DEPLOYMENT</code></td>
-<td>Model deployment name (e.g., <code>gpt-4o</code>)</td>
+<td>Model deployment name (default: <code>gpt-5-mini</code>)</td>
 <td>Yes</td>
-</tr>
-<tr>
-<td><code>AZURE_OPENAI_API_VERSION</code></td>
-<td>API version (default: <code>2024-06-01</code>)</td>
-<td>No</td>
 </tr>
 <tr>
 <td><code>APPLICATIONINSIGHTS_CONNECTION_STRING</code></td>
@@ -452,8 +422,8 @@ data: {&quot;type&quot;: &quot;done&quot;, &quot;usage&quot;: {&quot;prompt_toke
 <th>Required</th>
 </tr>
 </thead><tbody><tr>
-<td><code>NEXT_PUBLIC_API_BASE_URL</code></td>
-<td>Backend API base URL exposed to the browser</td>
+<td><code>NEXT_PUBLIC_API_URL</code></td>
+<td>Backend API base URL resolved by the frontend&#39;s runtime <code>/api/config</code> route</td>
 <td>Yes</td>
 </tr>
 <tr>
@@ -475,7 +445,7 @@ python -m venv .venv &amp;&amp; source .venv/bin/activate
 pip install -r requirements.txt
 
 # Set required environment variables
-export COSMOS_ENDPOINT=&quot;https://&lt;your-account&gt;.documents.azure.com:443/&quot;
+export COSMOS_DB_ENDPOINT=&quot;https://&lt;your-account&gt;.documents.azure.com:443/&quot;
 export COSMOS_DATABASE=&quot;agentsdb&quot;
 export AGENT_SERVICE_URL=&quot;http://localhost:8001&quot;
 export APPLICATIONINSIGHTS_CONNECTION_STRING=&quot;&lt;your-connection-string&gt;&quot;
@@ -488,7 +458,7 @@ pip install -r requirements.txt
 
 # Set required environment variables
 export AZURE_OPENAI_ENDPOINT=&quot;https://&lt;your-resource&gt;.openai.azure.com/&quot;
-export AZURE_OPENAI_DEPLOYMENT=&quot;gpt-4o&quot;
+export AZURE_OPENAI_DEPLOYMENT=&quot;gpt-5-mini&quot;
 export APPLICATIONINSIGHTS_CONNECTION_STRING=&quot;&lt;your-connection-string&gt;&quot;
 
 uvicorn app:app --reload --port 8001</code></pre>
@@ -497,7 +467,7 @@ uvicorn app:app --reload --port 8001</code></pre>
 npm install
 
 # Create .env.local
-echo &#39;NEXT_PUBLIC_API_BASE_URL=http://localhost:8000&#39; &gt; .env.local
+echo &#39;NEXT_PUBLIC_API_URL=http://localhost:8000&#39; &gt; .env.local
 
 npm run dev</code></pre>
 <p>The frontend is available at <code>http://localhost:3000</code>.</p>
@@ -570,6 +540,8 @@ customMetrics
 <li>Throttled requests (HTTP 429)</li>
 </ul>
 <h3 id="apim-analytics-dashboard">APIM Analytics Dashboard<a class="anchor" href="#apim-analytics-dashboard" aria-hidden="true">#</a></h3>
+<p>APIM is provisioned but is not in the reference application&#39;s active request path. Its analytics
+will remain empty until clients are explicitly routed through the APIM gateway.</p>
 <p>API Management provides built-in analytics:</p>
 <ul>
 <li><strong>Requests:</strong> Total calls, success/failure rates, response times by API and operation</li>
@@ -587,31 +559,23 @@ customMetrics
 </tr>
 </thead><tbody><tr>
 <td><code>main.bicep</code></td>
-<td>Orchestrates all modules; defines parameters and outputs</td>
+<td>Orchestrates modules; creates Azure AI Services, the <code>gpt-5-mini</code> deployment, managed identity, Key Vault, and role assignments</td>
 </tr>
 <tr>
-<td><code>containerApps.bicep</code></td>
-<td>Container Apps Environment, three Container Apps (frontend, backend, agent), scaling rules, managed identity assignments</td>
+<td><code>container-apps.bicep</code></td>
+<td>ACR, Container Apps Environment, three Container Apps, scaling rules, and ACR pull assignment</td>
 </tr>
 <tr>
-<td><code>cosmosDb.bicep</code></td>
+<td><code>cosmos-db.bicep</code></td>
 <td>Cosmos DB account (serverless), <code>agentsdb</code> database, <code>conversations</code> and <code>interactions</code> containers with partition keys</td>
 </tr>
 <tr>
-<td><code>apiManagement.bicep</code></td>
-<td>APIM instance, API definitions, policies for rate limiting and PTU load balancing, named values</td>
+<td><code>api-management.bicep</code></td>
+<td>APIM instance, API definitions, and rate-limit/CORS policies for future gateway integration</td>
 </tr>
 <tr>
 <td><code>monitoring.bicep</code></td>
 <td>Log Analytics workspace, Application Insights instance, diagnostic settings for all resources</td>
-</tr>
-<tr>
-<td><code>aiFoundry.bicep</code></td>
-<td>Azure AI Services account, model deployment (GPT-4o), managed identity role assignment</td>
-</tr>
-<tr>
-<td><code>security.bicep</code></td>
-<td>User-assigned managed identities, role assignments (Cosmos DB Data Contributor, Cognitive Services OpenAI User)</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -655,7 +619,7 @@ SOFTWARE.</code></pre>
         </article>
         
         <div class="filetree">
-          <div class="filetree-head">📁 agent-workload — 24 files · click any file to view it here (syntax-highlighted)</div>
+          <div class="filetree-head">📁 agent-workload — 25 files · click any file to view it here (syntax-highlighted)</div>
           <ul>
             <li><a href="../../code.html?path=resources%2Fagent-workload%2F.github%2Fworkflows%2Fdeploy.yml"><span class="ic">›</span>agent-workload/.github/workflows/deploy.yml</a></li>
             <li><a href="../../code.html?path=resources%2Fagent-workload%2F.gitignore"><span class="ic">›</span>agent-workload/.gitignore</a></li>
@@ -676,6 +640,7 @@ SOFTWARE.</code></pre>
             <li><a href="../../code.html?path=resources%2Fagent-workload%2Fsrc%2Ffrontend%2Fnext.config.js"><span class="ic">›</span>agent-workload/src/frontend/next.config.js</a></li>
             <li><a href="../../code.html?path=resources%2Fagent-workload%2Fsrc%2Ffrontend%2Fpackage.json"><span class="ic">›</span>agent-workload/src/frontend/package.json</a></li>
             <li><a href="../../code.html?path=resources%2Fagent-workload%2Fsrc%2Ffrontend%2Fpublic%2F.gitkeep"><span class="ic">›</span>agent-workload/src/frontend/public/.gitkeep</a></li>
+            <li><a href="../../code.html?path=resources%2Fagent-workload%2Fsrc%2Ffrontend%2Fsrc%2Fapp%2Fapi%2Fconfig%2Froute.ts"><span class="ic">›</span>agent-workload/src/frontend/src/app/api/config/route.ts</a></li>
             <li><a href="../../code.html?path=resources%2Fagent-workload%2Fsrc%2Ffrontend%2Fsrc%2Fapp%2Fglobals.css"><span class="ic">›</span>agent-workload/src/frontend/src/app/globals.css</a></li>
             <li><a href="../../code.html?path=resources%2Fagent-workload%2Fsrc%2Ffrontend%2Fsrc%2Fapp%2Flayout.tsx"><span class="ic">›</span>agent-workload/src/frontend/src/app/layout.tsx</a></li>
             <li><a href="../../code.html?path=resources%2Fagent-workload%2Fsrc%2Ffrontend%2Fsrc%2Fapp%2Fpage.tsx"><span class="ic">›</span>agent-workload/src/frontend/src/app/page.tsx</a></li>

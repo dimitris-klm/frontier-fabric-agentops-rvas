@@ -44,6 +44,7 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
 output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.id
 
 @description('Application Insights connection string.')
+@secure()
 output applicationInsightsConnectionString string = applicationInsights.properties.ConnectionString
 
 @description('Application Insights instrumentation key.')

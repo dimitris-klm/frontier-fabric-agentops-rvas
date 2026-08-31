@@ -11,6 +11,7 @@ param tags object = {}
 param logAnalyticsWorkspaceId string
 
 @description('Application Insights connection string.')
+@secure()
 param applicationInsightsConnectionString string
 
 @description('Cosmos DB endpoint URL.')
@@ -33,6 +34,7 @@ param managedIdentityPrincipalId string
 
 var containerRegistryName = replace('${environmentName}acr', '-', '')
 var placeholderImage = 'mcr.microsoft.com/k8se/quickstart:latest'
+var acrPullRoleDefinitionId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: last(split(logAnalyticsWorkspaceId, '/'))
@@ -48,6 +50,16 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
   properties: {
     adminUserEnabled: false
     publicNetworkAccess: 'Enabled'
+  }
+}
+
+resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerRegistryName, managedIdentityId, acrPullRoleDefinitionId)
+  scope: containerRegistry
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleDefinitionId)
+    principalId: managedIdentityPrincipalId
+    principalType: 'ServicePrincipal'
   }
 }
 
@@ -71,6 +83,7 @@ resource frontendApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${environmentName}-frontend'
   location: location
   tags: union(tags, { 'azd-service-name': 'frontend' })
+  dependsOn: [acrPullRoleAssignment]
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
@@ -133,6 +146,7 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${environmentName}-backend'
   location: location
   tags: union(tags, { 'azd-service-name': 'backend' })
+  dependsOn: [acrPullRoleAssignment]
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
@@ -207,6 +221,7 @@ resource agentApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${environmentName}-agent'
   location: location
   tags: union(tags, { 'azd-service-name': 'agent' })
+  dependsOn: [acrPullRoleAssignment]
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {

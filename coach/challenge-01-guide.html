@@ -87,22 +87,37 @@
 <p>The point is <strong>not</strong> &quot;deploy an app&quot; — it&#39;s understanding <strong>what telemetry the Control Tower will
 later consume and why</strong>. Make sure teams can trace a single user message across every hop and can
 name the custom token/cost metric. That mental model pays off in Challenges 4 and 5.</p>
-<p><strong>What good looks like:</strong> the team shows an end-to-end transaction (gateway → backend → agent → model</p>
-<ul>
-<li>Cosmos), points at a token metric, and finds their conversations in Cosmos DB.</li>
-</ul>
+<p><strong>What good looks like:</strong> the team shows an end-to-end transaction (backend → agent → model +
+Cosmos), points at a token metric, and finds their conversations in Cosmos DB. APIM is provisioned,
+but it is not in the reference application&#39;s active request path.</p>
 <h2 id="the-reference-path">The reference path<a class="anchor" href="#the-reference-path" aria-hidden="true">#</a></h2>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">cd resources/agent-workload
 azd auth login
 azd up        # env name, region (same as Challenge 0), subscription</code></pre>
 <ul>
-<li>Encourage <code>gpt-4o-mini</code> to conserve quota (check the model/deployment parameter in
-<code>infra/main.parameters.json</code> / <code>azd</code> env before deploying).</li>
+<li>The reference deployment uses <code>gpt-5-mini</code> version <code>2025-08-07</code> with the <code>GlobalStandard</code> SKU.</li>
 <li><code>azd up</code> provisions Container Apps env + 3 apps, APIM, Cosmos DB (serverless), Azure AI Services +
 model deployment, Log Analytics + Application Insights, and managed identities with role
 assignments. Expect <strong>10–20 min</strong>.</li>
 <li>Outputs include the <strong>frontend/backend/agent URLs</strong>.</li>
 </ul>
+<p>On networks that block package downloads from Docker containers, <code>azd up</code> can fail during local
+packaging. Keep Docker running for the <code>azd</code> prerequisite check, then use this fallback:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">azd provision
+ACR=$(az acr list -g &quot;$AZURE_RESOURCE_GROUP&quot; --query &#39;[0].name&#39; -o tsv)
+LOGIN_SERVER=$(az acr show -n &quot;$ACR&quot; --query loginServer -o tsv)
+TAG=&quot;deploy-$(date +%Y%m%d%H%M)&quot;
+
+az acr build -r &quot;$ACR&quot; -t &quot;agent:$TAG&quot; -f src/agent/Dockerfile src/agent
+az acr build -r &quot;$ACR&quot; -t &quot;backend:$TAG&quot; -f src/backend/Dockerfile src/backend
+az acr build -r &quot;$ACR&quot; -t &quot;frontend:$TAG&quot; -f src/frontend/Dockerfile src/frontend
+
+az containerapp update -g &quot;$AZURE_RESOURCE_GROUP&quot; -n &quot;$AZURE_ENV_NAME-agent&quot; --image &quot;$LOGIN_SERVER/agent:$TAG&quot;
+az containerapp update -g &quot;$AZURE_RESOURCE_GROUP&quot; -n &quot;$AZURE_ENV_NAME-backend&quot; --image &quot;$LOGIN_SERVER/backend:$TAG&quot;
+az containerapp update -g &quot;$AZURE_RESOURCE_GROUP&quot; -n &quot;$AZURE_ENV_NAME-frontend&quot; --image &quot;$LOGIN_SERVER/frontend:$TAG&quot;</code></pre>
+<p>The frontend build can print an <code>npm ci</code> <code>EUSAGE</code> error because the repository has no
+<code>package-lock.json</code>. This is expected: the Dockerfile uses <code>npm ci || npm install</code>, so the build
+continues with <code>npm install</code>. Treat it as non-blocking only when the ACR run ends in <code>Succeeded</code>.</p>
 <p>Generate traffic:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash"># Through the UI (preferred for the narrative), or burst the API:
 AGENT=https://&lt;agent-url&gt;
@@ -126,7 +141,7 @@ partition key (<code>conversation_id</code>). This is the data mirrored in Chall
 <h2 id="checkpoint-verification">Checkpoint verification<a class="anchor" href="#checkpoint-verification" aria-hidden="true">#</a></h2>
 <p>Have the team walk you through <strong>one</strong> message:</p>
 <ol>
-<li>The request in <strong>Transaction search</strong> with the full waterfall.</li>
+<li>The request in <strong>Transaction search</strong> with the backend → agent → model/Cosmos waterfall.</li>
 <li>The <strong>Application Map</strong> dependencies.</li>
 <li>A <strong>custom token/cost metric</strong> plotted or queried.</li>
 <li>The matching <strong>conversation</strong> document in Cosmos DB.</li>
@@ -146,8 +161,16 @@ partition key (<code>conversation_id</code>). This is the data mirrored in Chall
 <td>Managed identity <code>Cognitive Services OpenAI User</code> role still propagating — wait 5–10 min, retry; verify <code>AZURE_OPENAI_ENDPOINT</code>/deployment env</td>
 </tr>
 <tr>
-<td><strong>Quota exceeded</strong> on the model</td>
-<td>Switch deployment to <code>gpt-4o-mini</code> or lower TPM; confirm region quota</td>
+<td><strong>Quota or model deployment failure</strong></td>
+<td>Confirm <code>gpt-5-mini</code> version <code>2025-08-07</code> and <code>GlobalStandard</code> availability in the chosen region, or select another supported region/version</td>
+</tr>
+<tr>
+<td><code>azd up</code> fails while downloading packages in Docker</td>
+<td>Use the remote ACR build path above; this is an environment/network failure, not an infrastructure-template failure</td>
+</tr>
+<tr>
+<td>Frontend ACR build prints <code>npm ci</code> <code>EUSAGE</code></td>
+<td>Expected without <code>package-lock.json</code>; verify the fallback <code>npm install</code> succeeds and the ACR run reports <code>Succeeded</code></td>
 </tr>
 <tr>
 <td><strong>No telemetry</strong> in App Insights</td>
@@ -164,8 +187,9 @@ partition key (<code>conversation_id</code>). This is the data mirrored in Chall
 </tbody></table></div>
 <h2 id="talking-points-mini-briefing">Talking points (mini-briefing)<a class="anchor" href="#talking-points-mini-briefing" aria-hidden="true">#</a></h2>
 <ul>
-<li><strong>Every hop is observable.</strong> Distributed tracing connects frontend → APIM → backend → agent →
-model so you can attribute latency and errors precisely.</li>
+<li><strong>Every active service hop is observable.</strong> Distributed tracing connects backend → agent → model
+and Cosmos so you can attribute latency and errors precisely. APIM integration remains a future
+hardening opportunity.</li>
 <li><strong>Managed identity everywhere</strong> — no secrets; auth is Entra + RBAC. This is also how Fabric will
 reach the data later.</li>
 <li><strong>Tokens = money.</strong> The custom token metric is the seed of cost-per-request and FinOps chargeback

@@ -19,7 +19,7 @@ has something real to chew on.
 By the end of this challenge you will have:
 
 - Deployed a full-stack **Azure AI Foundry** agent workload to Azure.
-- Generated real agent traffic through the gateway → backend → agent → model path.
+- Generated real agent traffic through the frontend → backend → agent → model path.
 - Confirmed **distributed traces** connect every hop in Application Insights.
 - Found the **custom token/cost metrics** the agent emits.
 - Seen conversations land in **Cosmos DB** (the data the Control Tower will later mirror).
@@ -31,13 +31,14 @@ By the end of this challenge you will have:
 
 ## The workload
 
-The provided app has three Container Apps behind API Management, backed by Cosmos DB and a Foundry
-model deployment, all wired to Application Insights:
+The provided app has three Container Apps, backed by Cosmos DB and a Foundry model deployment, all
+wired to Application Insights. API Management is provisioned for future gateway integration, but the
+reference application currently calls the Container Apps directly:
 
 ```
-User → API Management → Frontend (Next.js) → Backend (FastAPI) → Agent (FastAPI) → Azure AI Foundry
-                                                   │
-                                                   └→ Cosmos DB (conversations & interactions)
+User → Frontend (Next.js) → Backend (FastAPI) → Agent (FastAPI) → Azure AI Foundry
+                                  │
+                                  └→ Cosmos DB (conversations & interactions)
 ```
 
 Everything is instrumented with the Azure Monitor OpenTelemetry SDK, and the agent records custom
@@ -76,7 +77,7 @@ Using Application Insights for this workload, demonstrate **all** of the followi
 ## Success criteria
 
 - [ ] The agent workload is deployed and the frontend responds to prompts end-to-end
-- [ ] You can show one **end-to-end trace** spanning gateway → backend → agent → model in App Insights
+- [ ] You can show one **end-to-end trace** spanning backend → agent → model in App Insights
 - [ ] The **Application Map** shows the services plus Cosmos DB and Azure OpenAI as dependencies
 - [ ] You can point to a **custom token/cost metric** emitted by the agent
 - [ ] Conversation/interaction documents are visible in **Cosmos DB**
@@ -95,8 +96,11 @@ cd resources/agent-workload
 azd auth login
 azd up      # pick your env name, region, and subscription when prompted
 ```
-Prefer `gpt-4o-mini` to conserve quota — check the model/deployment parameters before deploying.
-After deploy, `azd` prints the service URLs.
+The reference deployment uses `gpt-5-mini`. After deployment, `azd` prints the service URLs.
+
+`azd up` is the normal path when Docker can download packages from npm and PyPI. On a restricted
+network, ask your coach for the remote-build path: provision with `azd provision`, build each image
+with `az acr build`, and attach the resulting images with `az containerapp update`.
 </details>
 
 <details>

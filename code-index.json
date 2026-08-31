@@ -1,5 +1,5 @@
 {
-  "total": 62,
+  "total": 63,
   "groups": [
     {
       "id": "agent-workload",
@@ -12,7 +12,7 @@
         "Foundry"
       ],
       "readme": "resources/agent-workload/README.html",
-      "count": 24,
+      "count": 25,
       "files": [
         {
           "path": "resources/agent-workload/.github/workflows/deploy.yml",
@@ -89,6 +89,10 @@
         {
           "path": "resources/agent-workload/src/frontend/public/.gitkeep",
           "name": "src/frontend/public/.gitkeep"
+        },
+        {
+          "path": "resources/agent-workload/src/frontend/src/app/api/config/route.ts",
+          "name": "src/frontend/src/app/api/config/route.ts"
         },
         {
           "path": "resources/agent-workload/src/frontend/src/app/globals.css",

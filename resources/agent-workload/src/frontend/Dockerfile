@@ -1,6 +1,7 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
+# .npmrc is optional and git-ignored; supplies an approved registry on restricted networks
+COPY package.json package-lock.json* .npmrc* ./
 RUN npm ci || npm install
 
 FROM node:20-alpine AS builder

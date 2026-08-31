@@ -82,7 +82,7 @@ has something real to chew on.</p>
 <p>By the end of this challenge you will have:</p>
 <ul>
 <li>Deployed a full-stack <strong>Azure AI Foundry</strong> agent workload to Azure.</li>
-<li>Generated real agent traffic through the gateway → backend → agent → model path.</li>
+<li>Generated real agent traffic through the frontend → backend → agent → model path.</li>
 <li>Confirmed <strong>distributed traces</strong> connect every hop in Application Insights.</li>
 <li>Found the <strong>custom token/cost metrics</strong> the agent emits.</li>
 <li>Seen conversations land in <strong>Cosmos DB</strong> (the data the Control Tower will later mirror).</li>
@@ -93,11 +93,12 @@ has something real to chew on.</p>
 <li>The reference workload in <a href="../resources/agent-workload/README.html"><code>resources/agent-workload/</code></a>.</li>
 </ul>
 <h2 id="the-workload">The workload<a class="anchor" href="#the-workload" aria-hidden="true">#</a></h2>
-<p>The provided app has three Container Apps behind API Management, backed by Cosmos DB and a Foundry
-model deployment, all wired to Application Insights:</p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>User → API Management → Frontend (Next.js) → Backend (FastAPI) → Agent (FastAPI) → Azure AI Foundry
-                                                   │
-                                                   └→ Cosmos DB (conversations &amp; interactions)</code></pre>
+<p>The provided app has three Container Apps, backed by Cosmos DB and a Foundry model deployment, all
+wired to Application Insights. API Management is provisioned for future gateway integration, but the
+reference application currently calls the Container Apps directly:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>User → Frontend (Next.js) → Backend (FastAPI) → Agent (FastAPI) → Azure AI Foundry
+                                  │
+                                  └→ Cosmos DB (conversations &amp; interactions)</code></pre>
 <p>Everything is instrumented with the Azure Monitor OpenTelemetry SDK, and the agent records custom
 metrics for token usage and latency.</p>
 <h2 id="your-mission">Your mission<a class="anchor" href="#your-mission" aria-hidden="true">#</a></h2>
@@ -131,7 +132,7 @@ database/container names and the partition key — Challenge 3 will mirror this 
 <h2 id="success-criteria">Success criteria<a class="anchor" href="#success-criteria" aria-hidden="true">#</a></h2>
 <ul>
 <li><input disabled="" type="checkbox"> The agent workload is deployed and the frontend responds to prompts end-to-end</li>
-<li><input disabled="" type="checkbox"> You can show one <strong>end-to-end trace</strong> spanning gateway → backend → agent → model in App Insights</li>
+<li><input disabled="" type="checkbox"> You can show one <strong>end-to-end trace</strong> spanning backend → agent → model in App Insights</li>
 <li><input disabled="" type="checkbox"> The <strong>Application Map</strong> shows the services plus Cosmos DB and Azure OpenAI as dependencies</li>
 <li><input disabled="" type="checkbox"> You can point to a <strong>custom token/cost metric</strong> emitted by the agent</li>
 <li><input disabled="" type="checkbox"> Conversation/interaction documents are visible in <strong>Cosmos DB</strong></li>
@@ -148,8 +149,10 @@ telemetry — from the click to the model and back.</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">cd resources/agent-workload
 azd auth login
 azd up      # pick your env name, region, and subscription when prompted</code></pre>
-<p>Prefer <code>gpt-4o-mini</code> to conserve quota — check the model/deployment parameters before deploying.
-After deploy, <code>azd</code> prints the service URLs.</p>
+<p>The reference deployment uses <code>gpt-5-mini</code>. After deployment, <code>azd</code> prints the service URLs.</p>
+<p><code>azd up</code> is the normal path when Docker can download packages from npm and PyPI. On a restricted
+network, ask your coach for the remote-build path: provision with <code>azd provision</code>, build each image
+with <code>az acr build</code>, and attach the resulting images with <code>az containerapp update</code>.</p>
 </details>
 
 <details>

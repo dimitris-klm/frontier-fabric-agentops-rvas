@@ -7,7 +7,13 @@ param environmentName string
 param location string = resourceGroup().location
 
 @description('Azure OpenAI model deployment name.')
-param openAiModelName string = 'gpt-4o'
+param openAiModelName string = 'gpt-5-mini'
+
+@description('Azure OpenAI model version. Must be a non-deprecated version available in the target region.')
+param openAiModelVersion string = '2025-08-07'
+
+@description('Azure OpenAI deployment SKU. GA models in most regions require GlobalStandard.')
+param openAiSkuName string = 'GlobalStandard'
 
 var tags = {
   environment: environmentName
@@ -68,14 +74,14 @@ resource openAiDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024
   parent: cognitiveAccount
   name: openAiModelName
   sku: {
-    name: 'Standard'
+    name: openAiSkuName
     capacity: 30
   }
   properties: {
     model: {
       format: 'OpenAI'
       name: openAiModelName
-      version: '2024-08-06'
+      version: openAiModelVersion
     }
   }
 }
@@ -95,7 +101,8 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enableRbacAuthorization: true
     enableSoftDelete: true
     softDeleteRetentionInDays: 7
-    enablePurgeProtection: false
+    // Required by tenant policy; irreversible once enabled.
+    enablePurgeProtection: true
     publicNetworkAccess: 'Enabled'
   }
 }
@@ -168,26 +175,6 @@ resource keyVaultRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04
   }
 }
 
-// ACR Pull – allows managed identity to pull container images
-// Use deterministic name matching the container-apps module to avoid BCP120
-var containerRegistryName = replace('${environmentName}acr', '-', '')
-var acrPullRoleDefinitionId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-
-resource containerRegistryRef 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
-  name: containerRegistryName
-}
-
-resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(containerRegistryName, managedIdentity.id, acrPullRoleDefinitionId)
-  scope: containerRegistryRef
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleDefinitionId)
-    principalId: managedIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
-  }
-  dependsOn: [containerApps]
-}
-
 // Cognitive Services OpenAI User – allows managed identity to call OpenAI
 var cognitiveServicesOpenAiUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 
@@ -209,6 +196,7 @@ output AZURE_COSMOS_DB_ENDPOINT string = cosmosDb.outputs.cosmosDbEndpoint
 output AZURE_KEY_VAULT_NAME string = keyVault.name
 output AZURE_OPENAI_ENDPOINT string = cognitiveAccount.properties.endpoint
 output AZURE_OPENAI_DEPLOYMENT string = openAiModelName
+@secure()
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.applicationInsightsConnectionString
 output APPLICATIONINSIGHTS_NAME string = monitoring.outputs.applicationInsightsName
 output AZURE_APIM_GATEWAY_URL string = apiManagement.outputs.apimGatewayUrl

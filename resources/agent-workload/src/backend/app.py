@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 COSMOS_DB_ENDPOINT = os.environ.get("COSMOS_DB_ENDPOINT", "")
+COSMOS_DATABASE = os.environ.get("COSMOS_DATABASE", "agentsdb")
 AGENT_SERVICE_URL = os.environ.get("AGENT_SERVICE_URL", "http://localhost:8001")
 APPLICATIONINSIGHTS_CONNECTION_STRING = os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
 AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID", "")
@@ -64,7 +65,7 @@ class Conversation(BaseModel):
 async def lifespan(app: FastAPI):
     credential = DefaultAzureCredential(managed_identity_client_id=AZURE_CLIENT_ID) if AZURE_CLIENT_ID else DefaultAzureCredential()
     cosmos_client = CosmosClient(COSMOS_DB_ENDPOINT, credential=credential)
-    database = cosmos_client.get_database_client("observability-demo")
+    database = cosmos_client.get_database_client(COSMOS_DATABASE)
     app.state.conversations_container = database.get_container_client("conversations")
     app.state.interactions_container = database.get_container_client("interactions")
     app.state.http_client = httpx.AsyncClient(timeout=60.0)
@@ -116,7 +117,7 @@ async def get_conversation(conversation_id: str):
         items = [
             item
             async for item in app.state.conversations_container.query_items(
-                query=query, parameters=parameters, enable_cross_partition_query=True
+                query=query, parameters=parameters
             )
         ]
         if not items:
@@ -128,7 +129,7 @@ async def get_conversation(conversation_id: str):
         messages = [
             msg
             async for msg in app.state.interactions_container.query_items(
-                query=messages_query, parameters=messages_params, enable_cross_partition_query=True
+                query=messages_query, parameters=messages_params
             )
         ]
         conversation["messages"] = messages
@@ -148,7 +149,7 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         items = [
             item
             async for item in app.state.conversations_container.query_items(
-                query=query, parameters=parameters, enable_cross_partition_query=True
+                query=query, parameters=parameters
             )
         ]
         if not items:
@@ -169,7 +170,10 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     try:
         agent_response = await app.state.http_client.post(
             f"{AGENT_SERVICE_URL}/api/agent/invoke",
-            json={"message": request.content, "conversationId": conversation_id},
+            json={
+                "messages": [{"role": request.role, "content": request.content}],
+                "session_id": conversation_id,
+            },
         )
         agent_response.raise_for_status()
         agent_data = agent_response.json()
