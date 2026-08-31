@@ -48,11 +48,12 @@
           <li><a class="h2" href="#prerequisites">Prerequisites</a></li>
           <li><a class="h2" href="#the-landing-zone">The landing zone</a></li>
           <li><a class="h2" href="#your-mission">Your mission</a></li>
-          <li><a class="h3" href="#1-deploy-the-ingestion-infrastructure">1. Deploy the ingestion infrastructure</a></li>
-          <li><a class="h3" href="#2-wire-platform-diagnostics-into-the-lake">2. Wire platform diagnostics into the lake</a></li>
-          <li><a class="h3" href="#3-land-cost-and-resource-metadata">3. Land cost and resource metadata</a></li>
-          <li><a class="h3" href="#4-validate-the-data-lake">4. Validate the data lake</a></li>
-          <li><a class="h3" href="#5-record-the-coordinates-for-fabric">5. Record the coordinates for Fabric</a></li>
+          <li><a class="h3" href="#1-create-the-fabric-workspace-identity">1. Create the Fabric workspace identity</a></li>
+          <li><a class="h3" href="#2-deploy-the-ingestion-infrastructure">2. Deploy the ingestion infrastructure</a></li>
+          <li><a class="h3" href="#3-verify-platform-diagnostics">3. Verify platform diagnostics</a></li>
+          <li><a class="h3" href="#4-land-cost-and-resource-metadata">4. Land cost and resource metadata</a></li>
+          <li><a class="h3" href="#5-validate-the-data-lake">5. Validate the data lake</a></li>
+          <li><a class="h3" href="#6-record-the-coordinates-for-fabric">6. Record the coordinates for Fabric</a></li>
           <li><a class="h2" href="#success-criteria">Success criteria</a></li>
           <li><a class="h2" href="#hints">Hints</a></li>
           <li><a class="h2" href="#resources">Resources</a></li>
@@ -94,11 +95,13 @@ performance later.</p>
 <h2 id="prerequisites">Prerequisites<a class="anchor" href="#prerequisites" aria-hidden="true">#</a></h2>
 <ul>
 <li>✅ Challenge 0 complete — Azure access, region, subscription, and roles confirmed.</li>
+<li>A Fabric workspace assigned to your team&#39;s Fabric capacity. Reuse the workspace created in
+Challenge 0; create one in the Fabric portal if it does not exist.</li>
 <li><strong>Cost Management Reader</strong> at the billing/subscription scope for the person configuring cost export.</li>
 <li>The reference ingestion asset in
 <a href="../resources/observability-ingestion/README.html"><code>resources/observability-ingestion/</code></a>.</li>
-<li>Challenge 1 is strongly recommended because it gives you real agent workload resources to diagnose,
-but Challenges 1 and 2 can run <strong>in parallel</strong> if you split the team.</li>
+<li>Challenge 1 complete — this challenge reuses its resource group and Log Analytics workspace and
+gives you real agent workload telemetry to land.</li>
 </ul>
 <h2 id="the-landing-zone">The landing zone<a class="anchor" href="#the-landing-zone" aria-hidden="true">#</a></h2>
 <p>The provided ingestion layer lands four Azure signal families into one ADLS Gen2 account:</p>
@@ -149,41 +152,50 @@ ADLS Gen2 landing zone: costs · metrics · logs · metadata · diagnostics
                          ▼
 Challenge 3: Fabric Lakehouse + OneLake shortcuts</code></pre>
 <h2 id="your-mission">Your mission<a class="anchor" href="#your-mission" aria-hidden="true">#</a></h2>
-<h3 id="1-deploy-the-ingestion-infrastructure">1. Deploy the ingestion infrastructure<a class="anchor" href="#1-deploy-the-ingestion-infrastructure" aria-hidden="true">#</a></h3>
+<h3 id="1-create-the-fabric-workspace-identity">1. Create the Fabric workspace identity<a class="anchor" href="#1-create-the-fabric-workspace-identity" aria-hidden="true">#</a></h3>
+<p>Complete this prerequisite in the Fabric portal before deploying the ingestion infrastructure:</p>
+<ol>
+<li>Open the Fabric workspace created in Challenge 0, or create a workspace and assign it to your
+  team&#39;s Fabric capacity.</li>
+<li>Open <strong>Workspace settings</strong> &gt; <strong>Workspace identity</strong>.</li>
+<li>Select <strong>+ Workspace identity</strong> and wait for the identity to be created.</li>
+<li>Copy the workspace identity <strong>Object ID</strong>. This is its Microsoft Entra principal ID, not the
+  Fabric workspace ID or the identity&#39;s client ID.</li>
+<li>From <code>resources/observability-ingestion</code>, select the same <code>azd</code> environment used by the earlier
+  challenges and store the principal ID:</li>
+</ol>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">azd env select ctl-tower
+azd env set FABRIC_WORKSPACE_IDENTITY_PRINCIPAL_ID &lt;WORKSPACE_IDENTITY_OBJECT_ID&gt;</code></pre>
+<p>The deployment grants this identity <code>Storage Blob Data Contributor</code> on the landing-zone storage
+account. The identity will be used by Fabric connections and notebooks in the following steps.</p>
+<h3 id="2-deploy-the-ingestion-infrastructure">2. Deploy the ingestion infrastructure<a class="anchor" href="#2-deploy-the-ingestion-infrastructure" aria-hidden="true">#</a></h3>
 <ul>
 <li>Provision the ingestion stack from <a href="../resources/observability-ingestion/README.html"><code>resources/observability-ingestion/</code></a>.</li>
 <li>Confirm the deployment creates:<ul>
 <li>ADLS Gen2 storage with hierarchical namespace enabled</li>
 <li>Five containers: <code>costs</code>, <code>metrics</code>, <code>logs</code>, <code>metadata</code>, <code>diagnostics</code></li>
-<li>Log Analytics workspace with data export enabled</li>
+<li>A data export rule on the existing Challenge 1 Log Analytics workspace</li>
 <li>Cost Management FOCUS export</li>
-<li>Key Vault</li>
-<li>User-assigned managed identity</li>
 </ul>
 </li>
 <li>Capture the outputs for the storage account and Log Analytics workspace.</li>
 </ul>
-<h3 id="2-wire-platform-diagnostics-into-the-lake">2. Wire platform diagnostics into the lake<a class="anchor" href="#2-wire-platform-diagnostics-into-the-lake" aria-hidden="true">#</a></h3>
+<h3 id="3-verify-platform-diagnostics">3. Verify platform diagnostics<a class="anchor" href="#3-verify-platform-diagnostics" aria-hidden="true">#</a></h3>
 <ul>
-<li>Discover which Azure resources in your subscription support diagnostic settings.</li>
-<li>Configure supported resources to send logs and metrics to both:<ul>
-<li>the landing zone storage account, and</li>
-<li>the Log Analytics workspace.</li>
+<li>Confirm the Bicep deployment created a diagnostic setting on the reused Log Analytics workspace.</li>
+<li>Verify that its platform logs and metrics target both the landing-zone storage account and the
+Log Analytics workspace. No separate diagnostic setup script is required.</li>
 </ul>
-</li>
-<li>Include the resources deployed in Challenge 1 if they exist: Container Apps, API Management,
-Cosmos DB, Application Insights/Log Analytics, and related platform services.</li>
-<li>Use a dry run first so the team can see what will change before applying it.</li>
-</ul>
-<h3 id="3-land-cost-and-resource-metadata">3. Land cost and resource metadata<a class="anchor" href="#3-land-cost-and-resource-metadata" aria-hidden="true">#</a></h3>
+<h3 id="4-land-cost-and-resource-metadata">4. Land cost and resource metadata<a class="anchor" href="#4-land-cost-and-resource-metadata" aria-hidden="true">#</a></h3>
 <ul>
 <li>Trigger or confirm the <strong>Cost Management FOCUS</strong> export into the <code>costs</code> container.</li>
-<li>Run the <strong>Resource Graph</strong> metadata export into the <code>metadata</code> container.</li>
+<li>Create a Python virtual environment and run the <strong>Resource Graph</strong> metadata export once to seed
+the <code>metadata</code> container for the workshop.</li>
 <li>Confirm metadata includes resource IDs, names, types, locations, resource groups, tags, and
 subscription IDs.</li>
 <li>Watch for date-partitioned paths — this layout is what makes Spark reads efficient later.</li>
 </ul>
-<h3 id="4-validate-the-data-lake">4. Validate the data lake<a class="anchor" href="#4-validate-the-data-lake" aria-hidden="true">#</a></h3>
+<h3 id="5-validate-the-data-lake">5. Validate the data lake<a class="anchor" href="#5-validate-the-data-lake" aria-hidden="true">#</a></h3>
 <ul>
 <li>Inspect all five containers and confirm files are appearing where expected.</li>
 <li>Validate file counts, total sizes, latest timestamps, and sample Parquet schemas.</li>
@@ -195,7 +207,7 @@ subscription IDs.</li>
 </ul>
 </li>
 </ul>
-<h3 id="5-record-the-coordinates-for-fabric">5. Record the coordinates for Fabric<a class="anchor" href="#5-record-the-coordinates-for-fabric" aria-hidden="true">#</a></h3>
+<h3 id="6-record-the-coordinates-for-fabric">6. Record the coordinates for Fabric<a class="anchor" href="#6-record-the-coordinates-for-fabric" aria-hidden="true">#</a></h3>
 <p>Before moving on, write down:</p>
 <ul>
 <li>Storage account name</li>
@@ -207,12 +219,13 @@ subscription IDs.</li>
 <p>Challenge 3 depends on these values to create OneLake shortcuts without copying data.</p>
 <h2 id="success-criteria">Success criteria<a class="anchor" href="#success-criteria" aria-hidden="true">#</a></h2>
 <ul>
+<li><input disabled="" type="checkbox"> Fabric workspace identity exists and its Object ID is stored in the selected <code>azd</code> environment</li>
 <li><input disabled="" type="checkbox"> ADLS Gen2 storage exists with hierarchical namespace enabled</li>
 <li><input disabled="" type="checkbox"> All five containers exist: <code>costs</code>, <code>metrics</code>, <code>logs</code>, <code>metadata</code>, <code>diagnostics</code></li>
 <li><input disabled="" type="checkbox"> FOCUS cost Parquet is present in <code>costs</code> and validated</li>
 <li><input disabled="" type="checkbox"> Resource Graph metadata Parquet is present in <code>metadata</code></li>
 <li><input disabled="" type="checkbox"> Log Analytics data export rule is enabled for app request/dependency/trace/exception/metric tables</li>
-<li><input disabled="" type="checkbox"> Diagnostic settings are configured for supported resources and begin flowing</li>
+<li><input disabled="" type="checkbox"> The Log Analytics workspace diagnostic setting targets storage and Log Analytics</li>
 <li><input disabled="" type="checkbox"> <code>validate_exports.py</code> reports file counts, sizes, latest timestamps, and schemas</li>
 <li><input disabled="" type="checkbox"> The team has recorded the storage account name, resource ID, and DFS endpoint URL</li>
 </ul>
@@ -237,26 +250,18 @@ azd up      # use the same subscription and region from Challenge 0</code></pre>
 </details>
 
 <details>
-<summary>Previewing diagnostic settings before applying</summary>
-
-<p>The diagnostic setup script supports dry-run mode:</p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">cd resources/observability-ingestion/src/scripts
-pip install -r requirements.txt
-
-python setup_diagnostic_settings.py \
-  --subscription-id &lt;SUBSCRIPTION_ID&gt; \
-  --workspace-id &lt;WORKSPACE_RESOURCE_ID&gt; \
-  --storage-account-id &lt;STORAGE_ACCOUNT_RESOURCE_ID&gt; \
-  --dry-run</code></pre>
-<p>When the preview looks right, run the same command without <code>--dry-run</code>.</p>
-</details>
-
-<details>
 <summary>Exporting Resource Graph metadata</summary>
 
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">cd resources/observability-ingestion/src/scripts
-
-python resource_graph_export.py \
+python -m venv .venv</code></pre>
+<p>Windows PowerShell:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-powershell">.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt</code></pre>
+<p>macOS/Linux:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">source .venv/bin/activate
+python -m pip install -r requirements.txt</code></pre>
+<p>Run the one-time seed:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python resource_graph_export.py \
   --subscription-id &lt;SUBSCRIPTION_ID&gt; \
   --storage-account &lt;STORAGE_ACCOUNT_NAME&gt; \
   --container metadata</code></pre>
@@ -285,7 +290,7 @@ join spend to resource metadata and Challenge 5 can show cost by service, team, 
 <h2 id="resources">Resources<a class="anchor" href="#resources" aria-hidden="true">#</a></h2>
 <ul>
 <li><a href="../resources/observability-ingestion/README.html"><code>resources/observability-ingestion/README.md</code></a> — landing zone deployment and scripts</li>
-<li><a href="../resources/observability-ingestion/README.html"><code>resources/observability-ingestion/src/scripts/</code></a> — Resource Graph, diagnostic settings, and validation scripts</li>
+<li><a href="../resources/observability-ingestion/README.html"><code>resources/observability-ingestion/src/scripts/</code></a> — Resource Graph and validation scripts</li>
 <li><a href="../docs/architecture.html"><code>docs/architecture.md</code></a> — the Ingest stage and data layout</li>
 <li>Previous: <strong><a href="challenge-01-agent-telemetry.html">Challenge 1 — Light Up the Agents</a></strong></li>
 </ul>

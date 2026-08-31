@@ -91,27 +91,37 @@ proof that Challenge 3 can shortcut to them.</p>
 Parquet, confirms the Log Analytics export rule, applies diagnostic settings to supported resources,
 and records the storage account name, resource ID, and DFS endpoint.</p>
 <h2 id="the-reference-path">The reference path<a class="anchor" href="#the-reference-path" aria-hidden="true">#</a></h2>
+<p>Prepare the persistent Fabric identity before deployment:</p>
+<ol>
+<li>Reuse the team&#39;s Challenge 0 Fabric workspace. If it does not exist, create it in the Fabric
+  portal and assign it to the team&#39;s Fabric capacity.</li>
+<li>Open <strong>Workspace settings</strong> &gt; <strong>Workspace identity</strong> and select <strong>+ Workspace identity</strong>.</li>
+<li>Copy the identity <strong>Object ID</strong>, which is the Microsoft Entra principal ID. Do not use the Fabric
+  workspace ID or the identity&#39;s client ID.</li>
+<li>Store it in the same <code>azd</code> environment used by the team:</li>
+</ol>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">cd resources/observability-ingestion
+azd env select ctl-tower
+azd env set FABRIC_WORKSPACE_IDENTITY_PRINCIPAL_ID &lt;WORKSPACE_IDENTITY_OBJECT_ID&gt;</code></pre>
+<p>There is intentionally no preflight automation for this step. Workspace identity creation is an
+explicit workspace-admin action in the Fabric portal.</p>
 <p>Deploy the ingestion asset:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">cd resources/observability-ingestion
 azd auth login
 azd up        # env name, region (same as Challenge 0), subscription</code></pre>
-<p><code>azd up</code> provisions ADLS Gen2 storage, five containers, Log Analytics workspace + data export rule,
-Cost Management FOCUS export, Key Vault, and a user-assigned managed identity. Capture outputs:</p>
+<p><code>azd provision</code> creates the ADLS Gen2 landing zone, attaches a data export rule to the existing
+Challenge 1 Log Analytics workspace, configures its diagnostic setting, and creates the Cost
+Management FOCUS export. Capture outputs:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">azd env get-values</code></pre>
-<p>Install script dependencies:</p>
+<p>Create an isolated environment for the one-time lab seed:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">cd resources/observability-ingestion/src/scripts
-pip install -r requirements.txt</code></pre>
-<p>Preview diagnostic settings:</p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python setup_diagnostic_settings.py \
-  --subscription-id &lt;SUBSCRIPTION_ID&gt; \
-  --workspace-id &lt;WORKSPACE_RESOURCE_ID&gt; \
-  --storage-account-id &lt;STORAGE_ACCOUNT_RESOURCE_ID&gt; \
-  --dry-run</code></pre>
-<p>Apply diagnostic settings:</p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python setup_diagnostic_settings.py \
-  --subscription-id &lt;SUBSCRIPTION_ID&gt; \
-  --workspace-id &lt;WORKSPACE_RESOURCE_ID&gt; \
-  --storage-account-id &lt;STORAGE_ACCOUNT_RESOURCE_ID&gt;</code></pre>
+python -m venv .venv</code></pre>
+<p>Windows PowerShell:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-powershell">.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt</code></pre>
+<p>macOS/Linux:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">source .venv/bin/activate
+python -m pip install -r requirements.txt</code></pre>
 <p>Run Resource Graph export:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python resource_graph_export.py \
   --subscription-id &lt;SUBSCRIPTION_ID&gt; \
@@ -140,7 +150,7 @@ az rest --method post \
 <li><strong>Resource Graph Parquet</strong> under <code>metadata/resource-graph/year=*/month=*/day=*/</code>.</li>
 <li><strong>Log Analytics data export</strong> enabled for <code>AppRequests</code>, <code>AppDependencies</code>, <code>AppTraces</code>,
 <code>AppExceptions</code>, and <code>AppMetrics</code>.</li>
-<li><strong>Diagnostic settings</strong> created on supported resources; unsupported types skipped gracefully.</li>
+<li><strong>Diagnostic setting</strong> on the reused Log Analytics workspace targets storage and Log Analytics.</li>
 <li><code>validate_exports.py</code> output with file counts, sizes, latest timestamps, and sample schemas.</li>
 <li>Recorded Fabric coordinates:<ul>
 <li>storage account name</li>
@@ -157,6 +167,14 @@ shortcut to it.</p>
 <th>Fix</th>
 </tr>
 </thead><tbody><tr>
+<td><code>FABRIC_WORKSPACE_IDENTITY_PRINCIPAL_ID</code> is missing</td>
+<td>Create the identity under <strong>Workspace settings</strong> &gt; <strong>Workspace identity</strong>, copy its <strong>Object ID</strong>, and store it with <code>azd env set</code></td>
+</tr>
+<tr>
+<td>Storage role assignment targets the wrong ID</td>
+<td>Use the workspace identity <strong>Object ID</strong>, not the Fabric workspace ID or managed identity client ID</td>
+</tr>
+<tr>
 <td>Missing <strong>Cost Management Reader</strong></td>
 <td>Grant at the billing/subscription scope; Contributor on the resource group is not enough for cost exports</td>
 </tr>
@@ -177,10 +195,6 @@ shortcut to it.</p>
 <td>It does not for this reference path; verify the rule is enabled and treat it as continuous export</td>
 </tr>
 <tr>
-<td>Diagnostic settings fail on some resources</td>
-<td>Normal. The script skips known unsupported types and logs warnings for resources without categories</td>
-</tr>
-<tr>
 <td>Storage access denied from scripts</td>
 <td>Ensure the caller/identity has Storage Blob Data Contributor on the storage account or resource group</td>
 </tr>
@@ -197,8 +211,8 @@ resources, services, and agent namespaces.</li>
 queryable together instead of trapped in separate portals.</li>
 <li><strong>Date partitions are Spark fuel.</strong> The storage layout is already shaped for Fabric notebooks and
 medallion processing.</li>
-<li><strong>Continuous vs batch matters.</strong> Log Analytics and diagnostics stream continuously; cost and
-Resource Graph are scheduled/triggered snapshots.</li>
+<li><strong>Continuous vs batch matters.</strong> Log Analytics and diagnostics stream continuously; cost is a
+scheduled Azure export; Resource Graph is seeded once for the workshop.</li>
 <li><strong>This is Challenge 3&#39;s shortcut target.</strong> The storage DFS endpoint is the bridge into OneLake with
 no data copy.</li>
 </ul>
@@ -218,7 +232,7 @@ feeds each one.</li>
 <li><a href="../code.html?path=resources%2Fobservability-ingestion%2Finfra%2Fmodules%2Fstorage.bicep"><code>resources/observability-ingestion/infra/modules/storage.bicep</code></a> — five containers and ADLS Gen2 settings</li>
 <li><a href="../code.html?path=resources%2Fobservability-ingestion%2Finfra%2Fmodules%2Fmonitoring.bicep"><code>resources/observability-ingestion/infra/modules/monitoring.bicep</code></a> — Log Analytics data export tables</li>
 <li><a href="../code.html?path=resources%2Fobservability-ingestion%2Finfra%2Fmodules%2Fcost-export.bicep"><code>resources/observability-ingestion/infra/modules/cost-export.bicep</code></a> — FOCUS Parquet export</li>
-<li><a href="../resources/observability-ingestion/README.html"><code>resources/observability-ingestion/src/scripts/</code></a> — Resource Graph, diagnostic settings, validation</li>
+<li><a href="../resources/observability-ingestion/README.html"><code>resources/observability-ingestion/src/scripts/</code></a> — Resource Graph export and validation</li>
 <li><a href="../docs/architecture.html"><code>docs/architecture.md</code></a> — Ingest stage and Gold data products</li>
 </ul>
 

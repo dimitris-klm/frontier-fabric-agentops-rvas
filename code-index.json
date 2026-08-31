@@ -12,7 +12,7 @@
         "Foundry"
       ],
       "readme": "resources/agent-workload/README.html",
-      "count": 25,
+      "count": 26,
       "files": [
         {
           "path": "resources/agent-workload/.github/workflows/deploy.yml",
@@ -73,6 +73,10 @@
         {
           "path": "resources/agent-workload/src/backend/requirements.txt",
           "name": "src/backend/requirements.txt"
+        },
+        {
+          "path": "resources/agent-workload/src/frontend/.npmrc",
+          "name": "src/frontend/.npmrc"
         },
         {
           "path": "resources/agent-workload/src/frontend/Dockerfile",
@@ -200,7 +204,7 @@
         "Resource Graph"
       ],
       "readme": "resources/observability-ingestion/README.html",
-      "count": 14,
+      "count": 13,
       "files": [
         {
           "path": "resources/observability-ingestion/.github/workflows/deploy.yml",
@@ -249,10 +253,6 @@
         {
           "path": "resources/observability-ingestion/src/scripts/resource_graph_export.py",
           "name": "src/scripts/resource_graph_export.py"
-        },
-        {
-          "path": "resources/observability-ingestion/src/scripts/setup_diagnostic_settings.py",
-          "name": "src/scripts/setup_diagnostic_settings.py"
         },
         {
           "path": "resources/observability-ingestion/src/scripts/validate_exports.py",

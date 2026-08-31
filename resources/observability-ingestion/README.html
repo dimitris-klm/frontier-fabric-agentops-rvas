@@ -48,11 +48,11 @@
           <li><a class="h3" href="#data-flows">Data Flows</a></li>
           <li><a class="h2" href="#prerequisites">Prerequisites</a></li>
           <li><a class="h2" href="#deployment">Deployment</a></li>
+          <li><a class="h3" href="#create-the-fabric-workspace-identity">Create the Fabric workspace identity</a></li>
           <li><a class="h3" href="#with-azure-developer-cli">With Azure Developer CLI</a></li>
           <li><a class="h3" href="#manual-bicep-deployment">Manual Bicep Deployment</a></li>
-          <li><a class="h2" href="#running-scripts">Running Scripts</a></li>
+          <li><a class="h2" href="#seed-and-validate-the-landing-zone">Seed and Validate the Landing Zone</a></li>
           <li><a class="h3" href="#resource-graph-export">Resource Graph Export</a></li>
-          <li><a class="h3" href="#setup-diagnostic-settings">Setup Diagnostic Settings</a></li>
           <li><a class="h3" href="#validate-exports">Validate Exports</a></li>
           <li><a class="h2" href="#data-format-reference">Data Format Reference</a></li>
           <li><a class="h3" href="#focus-cost-format">FOCUS Cost Format</a></li>
@@ -118,7 +118,7 @@ metadata into ADLS Gen2 so Fabric can shortcut to it in later challenges.</p>
 <td>Azure Resource Graph</td>
 <td><code>metadata</code></td>
 <td>Parquet (Snappy)</td>
-<td>Daily (cron)</td>
+<td>One-time lab seed</td>
 </tr>
 <tr>
 <td>Log Analytics Data Export</td>
@@ -138,15 +138,29 @@ metadata into ADLS Gen2 so Fabric can shortcut to it in later challenges.</p>
 <li><a href="https://learn.microsoft.com/cli/azure/install-azure-cli" target="_blank" rel="noopener">Azure CLI</a> v2.60+</li>
 <li><a href="https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd" target="_blank" rel="noopener">Azure Developer CLI (azd)</a> v1.9+</li>
 <li>An Azure subscription with <strong>Contributor</strong> and <strong>Cost Management Reader</strong> permissions</li>
+<li>A Fabric workspace assigned to a Fabric capacity</li>
+<li>Workspace administrator access to create the Fabric workspace identity</li>
 <li>Python 3.11+</li>
 </ul>
 <h2 id="deployment">Deployment<a class="anchor" href="#deployment" aria-hidden="true">#</a></h2>
+<h3 id="create-the-fabric-workspace-identity">Create the Fabric workspace identity<a class="anchor" href="#create-the-fabric-workspace-identity" aria-hidden="true">#</a></h3>
+<p>In the Fabric portal:</p>
+<ol>
+<li>Open the workspace created for the workshop, or create one and assign it to your Fabric capacity.</li>
+<li>Open <strong>Workspace settings</strong> &gt; <strong>Workspace identity</strong>.</li>
+<li>Select <strong>+ Workspace identity</strong>.</li>
+<li>Copy the identity <strong>Object ID</strong>. Do not use the Fabric workspace ID or client ID.</li>
+<li>Store the Object ID in the <code>azd</code> environment used for the workshop:</li>
+</ol>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">azd env select ctl-tower
+azd env set FABRIC_WORKSPACE_IDENTITY_PRINCIPAL_ID &lt;WORKSPACE_IDENTITY_OBJECT_ID&gt;</code></pre>
+<p>The Bicep deployment uses this principal ID to grant the workspace identity <code>Storage Blob Data Contributor</code> on the landing-zone storage account.</p>
 <h3 id="with-azure-developer-cli">With Azure Developer CLI<a class="anchor" href="#with-azure-developer-cli" aria-hidden="true">#</a></h3>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash"># Authenticate
 azd auth login
 
 # Provision infrastructure
-azd up</code></pre>
+azd provision</code></pre>
 <p>You will be prompted for:</p>
 <ul>
 <li><strong>Environment name</strong> — a short identifier (e.g., <code>dev</code>, <code>demo</code>)</li>
@@ -159,23 +173,30 @@ azd up</code></pre>
   --template-file infra/main.bicep \
   --parameters infra/main.parameters.json \
   --parameters environmentName=demo location=eastus2</code></pre>
-<h2 id="running-scripts">Running Scripts<a class="anchor" href="#running-scripts" aria-hidden="true">#</a></h2>
+<h2 id="seed-and-validate-the-landing-zone">Seed and Validate the Landing Zone<a class="anchor" href="#seed-and-validate-the-landing-zone" aria-hidden="true">#</a></h2>
+<p>The scripts are a one-time workshop bootstrap. They make data available immediately without adding
+a production scheduler before the Fabric data path is built. Challenge 6 can move the same exporter
+to unattended cloud execution without changing its ADLS data contract.</p>
+<p>Authenticate with Azure, then create an isolated Python environment:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">az login
+cd src/scripts
+python -m venv .venv</code></pre>
+<p>Activate it on Windows PowerShell:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-powershell">.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt</code></pre>
+<p>Or activate it on macOS/Linux:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt</code></pre>
 <h3 id="resource-graph-export">Resource Graph Export<a class="anchor" href="#resource-graph-export" aria-hidden="true">#</a></h3>
 <p>Queries Azure Resource Graph for resource metadata and exports to ADLS Gen2:</p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">cd src/scripts
-pip install -r requirements.txt
-
-python resource_graph_export.py \
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python resource_graph_export.py \
   --subscription-id &lt;SUBSCRIPTION_ID&gt; \
   --storage-account &lt;STORAGE_ACCOUNT_NAME&gt; \
   --container metadata</code></pre>
-<h3 id="setup-diagnostic-settings">Setup Diagnostic Settings<a class="anchor" href="#setup-diagnostic-settings" aria-hidden="true">#</a></h3>
-<p>Discovers resources and creates diagnostic settings (supports dry-run):</p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python setup_diagnostic_settings.py \
-  --subscription-id &lt;SUBSCRIPTION_ID&gt; \
-  --workspace-id &lt;WORKSPACE_RESOURCE_ID&gt; \
-  --storage-account-id &lt;STORAGE_ACCOUNT_RESOURCE_ID&gt; \
-  --dry-run</code></pre>
+<p>Diagnostic settings for the reused Log Analytics workspace are deployed by Bicep. No setup script is
+required.</p>
 <h3 id="validate-exports">Validate Exports<a class="anchor" href="#validate-exports" aria-hidden="true">#</a></h3>
 <p>Inspects storage containers and reports on ingested data:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python validate_exports.py \
@@ -327,15 +348,7 @@ python resource_graph_export.py \
 </tr>
 <tr>
 <td>Diagnostic Settings</td>
-<td>Resource-level telemetry capture</td>
-</tr>
-<tr>
-<td>User-Assigned Managed Identity</td>
-<td>Service authentication</td>
-</tr>
-<tr>
-<td>Key Vault</td>
-<td>Secrets and connection details</td>
+<td>Log Analytics platform logs and metrics routed to the landing zone</td>
 </tr>
 </tbody></table></div>
 <h2 id="cicd">CI/CD<a class="anchor" href="#cicd" aria-hidden="true">#</a></h2>
@@ -349,7 +362,7 @@ python resource_graph_export.py \
         </article>
         
         <div class="filetree">
-          <div class="filetree-head">📁 observability-ingestion — 14 files · click any file to view it here (syntax-highlighted)</div>
+          <div class="filetree-head">📁 observability-ingestion — 13 files · click any file to view it here (syntax-highlighted)</div>
           <ul>
             <li><a href="../../code.html?path=resources%2Fobservability-ingestion%2F.github%2Fworkflows%2Fdeploy.yml"><span class="ic">›</span>observability-ingestion/.github/workflows/deploy.yml</a></li>
             <li><a href="../../code.html?path=resources%2Fobservability-ingestion%2F.github%2Fworkflows%2Fscheduled-export.yml"><span class="ic">›</span>observability-ingestion/.github/workflows/scheduled-export.yml</a></li>
@@ -363,7 +376,6 @@ python resource_graph_export.py \
             <li><a href="../../code.html?path=resources%2Fobservability-ingestion%2Finfra%2Fmodules%2Fstorage.bicep"><span class="ic">›</span>observability-ingestion/infra/modules/storage.bicep</a></li>
             <li><a href="../../code.html?path=resources%2Fobservability-ingestion%2Fsrc%2Fscripts%2Frequirements.txt"><span class="ic">›</span>observability-ingestion/src/scripts/requirements.txt</a></li>
             <li><a href="../../code.html?path=resources%2Fobservability-ingestion%2Fsrc%2Fscripts%2Fresource_graph_export.py"><span class="ic">›</span>observability-ingestion/src/scripts/resource_graph_export.py</a></li>
-            <li><a href="../../code.html?path=resources%2Fobservability-ingestion%2Fsrc%2Fscripts%2Fsetup_diagnostic_settings.py"><span class="ic">›</span>observability-ingestion/src/scripts/setup_diagnostic_settings.py</a></li>
             <li><a href="../../code.html?path=resources%2Fobservability-ingestion%2Fsrc%2Fscripts%2Fvalidate_exports.py"><span class="ic">›</span>observability-ingestion/src/scripts/validate_exports.py</a></li>
           </ul>
         </div>

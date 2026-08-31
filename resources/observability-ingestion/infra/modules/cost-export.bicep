@@ -6,7 +6,7 @@ param exportName string
 @description('Resource ID of the destination storage account.')
 param storageAccountId string
 
-resource costExport 'Microsoft.CostManagement/exports@2023-11-01' = {
+resource costExport 'Microsoft.CostManagement/exports@2025-03-01' = {
   name: exportName
   properties: {
     definition: {

@@ -44,7 +44,7 @@ This component provisions the **landing zone** of the AgentOps Control Tower:
 | Source | Container | Format | Schedule |
 |---|---|---|---|
 | Azure Cost Management | `costs` | FOCUS Parquet (Snappy) | Daily |
-| Azure Resource Graph | `metadata` | Parquet (Snappy) | Daily (cron) |
+| Azure Resource Graph | `metadata` | Parquet (Snappy) | One-time lab seed |
 | Log Analytics Data Export | `metrics`, `logs` | JSON | Continuous |
 | Diagnostic Settings | `diagnostics` | JSON | Continuous |
 
@@ -53,9 +53,29 @@ This component provisions the **landing zone** of the AgentOps Control Tower:
 - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) v2.60+
 - [Azure Developer CLI (azd)](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) v1.9+
 - An Azure subscription with **Contributor** and **Cost Management Reader** permissions
+- A Fabric workspace assigned to a Fabric capacity
+- Workspace administrator access to create the Fabric workspace identity
 - Python 3.11+
 
 ## Deployment
+
+### Create the Fabric workspace identity
+
+In the Fabric portal:
+
+1. Open the workspace created for the workshop, or create one and assign it to your Fabric capacity.
+2. Open **Workspace settings** > **Workspace identity**.
+3. Select **+ Workspace identity**.
+4. Copy the identity **Object ID**. Do not use the Fabric workspace ID or client ID.
+5. Store the Object ID in the `azd` environment used for the workshop:
+
+```bash
+azd env select ctl-tower
+azd env set FABRIC_WORKSPACE_IDENTITY_PRINCIPAL_ID <WORKSPACE_IDENTITY_OBJECT_ID>
+```
+
+The Bicep deployment uses this principal ID to grant the workspace identity `Storage Blob Data
+Contributor` on the landing-zone storage account.
 
 ### With Azure Developer CLI
 
@@ -64,7 +84,7 @@ This component provisions the **landing zone** of the AgentOps Control Tower:
 azd auth login
 
 # Provision infrastructure
-azd up
+azd provision
 ```
 
 You will be prompted for:
@@ -82,33 +102,49 @@ az deployment group create \
   --parameters environmentName=demo location=eastus2
 ```
 
-## Running Scripts
+## Seed and Validate the Landing Zone
+
+The scripts are a one-time workshop bootstrap. They make data available immediately without adding
+a production scheduler before the Fabric data path is built. Challenge 6 can move the same exporter
+to unattended cloud execution without changing its ADLS data contract.
+
+Authenticate with Azure, then create an isolated Python environment:
+
+```bash
+az login
+cd src/scripts
+python -m venv .venv
+```
+
+Activate it on Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Or activate it on macOS/Linux:
+
+```bash
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
 
 ### Resource Graph Export
 
 Queries Azure Resource Graph for resource metadata and exports to ADLS Gen2:
 
 ```bash
-cd src/scripts
-pip install -r requirements.txt
-
 python resource_graph_export.py \
   --subscription-id <SUBSCRIPTION_ID> \
   --storage-account <STORAGE_ACCOUNT_NAME> \
   --container metadata
 ```
 
-### Setup Diagnostic Settings
-
-Discovers resources and creates diagnostic settings (supports dry-run):
-
-```bash
-python setup_diagnostic_settings.py \
-  --subscription-id <SUBSCRIPTION_ID> \
-  --workspace-id <WORKSPACE_RESOURCE_ID> \
-  --storage-account-id <STORAGE_ACCOUNT_RESOURCE_ID> \
-  --dry-run
-```
+Diagnostic settings for the reused Log Analytics workspace are deployed by Bicep. No setup script is
+required.
 
 ### Validate Exports
 
@@ -199,9 +235,7 @@ The storage account uses hierarchical namespace (ADLS Gen2) and date-partitioned
 | Log Analytics Workspace | Log and metric collection |
 | Data Export Rules | Continuous export from workspace to storage |
 | Cost Management Export | Daily FOCUS cost data |
-| Diagnostic Settings | Resource-level telemetry capture |
-| User-Assigned Managed Identity | Service authentication |
-| Key Vault | Secrets and connection details |
+| Diagnostic Settings | Log Analytics platform logs and metrics routed to the landing zone |
 
 ## CI/CD
 
