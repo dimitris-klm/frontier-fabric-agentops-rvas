@@ -39,13 +39,13 @@ QUERIES = {
     ),
     "resource_counts_by_type": (
         "Resources "
-        "| summarize count=count() by type "
-        "| order by count desc"
+        "| summarize resourceCount=count() by type "
+        "| order by resourceCount desc"
     ),
     "resources_by_location": (
         "Resources "
-        "| summarize count=count() by location, type "
-        "| order by location asc, count desc"
+        "| summarize resourceCount=count() by location, type "
+        "| order by location asc, resourceCount desc"
     ),
 }
 
@@ -98,7 +98,13 @@ def upload_parquet_to_adls(
 
     file_client = dir_client.get_file_client(filename)
     file_client.upload_data(buffer.getvalue(), overwrite=True)
-    logger.info("Uploaded %s/%s/%s (%d rows)", container, directory, filename, len(df))
+    logger.info(
+        "Uploaded %s/%s/%s (%d rows)",
+        container,
+        directory,
+        filename,
+        len(df),
+    )
 
 
 def main() -> None:
@@ -132,7 +138,10 @@ def main() -> None:
     )
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
-    date_partition = datetime.now(timezone.utc).strftime("year=%Y/month=%m/day=%d")
+    date_partition = datetime.now(timezone.utc).strftime(
+        "year=%Y/month=%m/day=%d"
+    )
+    failed_queries: list[str] = []
 
     for query_name, query_text in QUERIES.items():
         logger.info("Running query: %s", query_name)
@@ -144,6 +153,7 @@ def main() -> None:
             )
         except Exception:
             logger.exception("Failed to execute query '%s'", query_name)
+            failed_queries.append(query_name)
             continue
 
         if not rows:
@@ -166,7 +176,12 @@ def main() -> None:
             logger.exception(
                 "Failed to upload results for query '%s'", query_name
             )
-            continue
+            failed_queries.append(query_name)
+
+    if failed_queries:
+        raise RuntimeError(
+            "Resource Graph export failed for: " + ", ".join(failed_queries)
+        )
 
     logger.info("Resource Graph export completed.")
 

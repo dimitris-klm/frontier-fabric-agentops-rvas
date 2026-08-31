@@ -7,6 +7,9 @@ param location string
 @description('Tags to apply to all resources.')
 param tags object = {}
 
+@description('Principal ID of the Fabric workspace identity used to access observability data.')
+param fabricWorkspaceIdentityPrincipalId string
+
 var containers = [
   'costs'
   'metrics'
@@ -54,11 +57,6 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01'
   parent: storageAccount
   name: 'default'
   properties: {
-    isVersioningEnabled: true
-    changeFeed: {
-      enabled: true
-      retentionInDays: 30
-    }
     deleteRetentionPolicy: {
       enabled: true
       days: 7
@@ -80,6 +78,18 @@ resource blobContainers 'Microsoft.Storage/storageAccounts/blobServices/containe
   }
 ]
 
+var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+
+resource workspaceIdentityStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, fabricWorkspaceIdentityPrincipalId, storageBlobDataContributorRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
+    principalId: fabricWorkspaceIdentityPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2023-05-01' = {
   parent: storageAccount
   name: 'default'
@@ -95,16 +105,6 @@ resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2
               baseBlob: {
                 tierToCool: {
                   daysAfterModificationGreaterThan: 90
-                }
-              }
-              snapshot: {
-                tierToCool: {
-                  daysAfterCreationGreaterThan: 90
-                }
-              }
-              version: {
-                tierToCool: {
-                  daysAfterCreationGreaterThan: 90
                 }
               }
             }
@@ -124,16 +124,6 @@ resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2
               baseBlob: {
                 tierToArchive: {
                   daysAfterModificationGreaterThan: 365
-                }
-              }
-              snapshot: {
-                tierToArchive: {
-                  daysAfterCreationGreaterThan: 365
-                }
-              }
-              version: {
-                tierToArchive: {
-                  daysAfterCreationGreaterThan: 365
                 }
               }
             }

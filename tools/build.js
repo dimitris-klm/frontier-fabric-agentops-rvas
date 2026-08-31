@@ -18,7 +18,7 @@ const REPO = 'microsoft/frontier-fabric-agentops-rvas';
 const REPO_URL = `https://github.com/${REPO}`;
 const BLOB = `${REPO_URL}/blob/main`;
 const SITE_TITLE = 'Frontier Fabric AgentOps RVAS';
-const EXCLUDE_DIRS = new Set(['.git', '.agents', 'node_modules', 'tools']);
+const EXCLUDE_DIRS = new Set(['.git', '.agents', '.azure', '__pycache__', 'node_modules', 'tools']);
 
 const CAT_LABEL = { challenges: 'Challenges', coach: 'Coach', docs: 'Docs', resources: 'Resources', root: 'Home' };
 
@@ -56,7 +56,7 @@ function listFilesFlat(dir) {
   const out = [];
   (function rec(d) {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-      if (e.name === '.git' || e.name === 'node_modules') continue;
+      if (EXCLUDE_DIRS.has(e.name)) continue;
       const full = path.join(d, e.name);
       if (e.isDirectory()) rec(full);
       else out.push(path.relative(ROOT, full).split(path.sep).join('/'));

@@ -1,5 +1,5 @@
 {
-  "total": 62,
+  "total": 61,
   "groups": [
     {
       "id": "agent-workload",
@@ -196,7 +196,7 @@
         "Resource Graph"
       ],
       "readme": "resources/observability-ingestion/README.html",
-      "count": 14,
+      "count": 13,
       "files": [
         {
           "path": "resources/observability-ingestion/.github/workflows/deploy.yml",
@@ -245,10 +245,6 @@
         {
           "path": "resources/observability-ingestion/src/scripts/resource_graph_export.py",
           "name": "src/scripts/resource_graph_export.py"
-        },
-        {
-          "path": "resources/observability-ingestion/src/scripts/setup_diagnostic_settings.py",
-          "name": "src/scripts/setup_diagnostic_settings.py"
         },
         {
           "path": "resources/observability-ingestion/src/scripts/validate_exports.py",
