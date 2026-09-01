@@ -34,18 +34,24 @@ Run from the repo root unless noted.
    pip install -r src/setup/requirements.txt
    ```
 
-2. **Confirm storage RBAC**
-   - The Fabric workspace identity / managed identity needs **Storage Blob Data Reader** on the ADLS
+2. **Create the ADLS Gen2 cloud connection**
+   - The organizational account used by the connection needs **Storage Blob Data Reader** on the ADLS
      Gen2 account created in Challenge 2.
    - The setup script uses ADLS Gen2 shortcuts with the storage DFS endpoint, so the URL should look
      like `https://<account>.dfs.core.windows.net`.
    - Containers expected by the script: `costs`, `metrics`, `logs`, `metadata`.
+   - In Fabric, open **Settings** > **Manage connections and gateways**, create a **Cloud** connection
+     of type **Azure Data Lake Storage Gen2**, and use **Organizational account** authentication with
+     the **Organizational** privacy level.
+   - Scope the connection to the storage account root if a path is requested, then copy the connection
+     ID from its settings. The same connection ID is used for all four shortcuts.
 
 3. **Create workspace, Lakehouse, shortcuts, notebooks, and pipelines**
    ```bash
    python src/setup/setup_fabric_workspace.py \
      --workspace-name "Observability-Analytics" \
      --storage-account-url "https://<account>.dfs.core.windows.net" \
+     --connection-id "<fabric-cloud-connection-id>" \
      --capacity-id "<fabric-capacity-id>"
    ```
 
@@ -68,7 +74,7 @@ Run from the repo root unless noted.
 
 5. **Handle async Fabric API creation**
    - `setup_fabric_workspace.py` and `setup_cosmos_mirroring.py` both tolerate existing items.
-   - If item creation returns `202 Accepted`, wait for provisioning to finish and rerun the script.
+  - `setup_fabric_workspace.py` waits for asynchronous item creation before continuing.
 
 ## Checkpoint verification
 
@@ -93,12 +99,13 @@ movement patterns without prompting.
 
 | Pitfall | Fix |
 |---|---|
-| Shortcut creation or browsing returns **403** | Grant the workspace identity / managed identity **Storage Blob Data Reader** on the Challenge 2 storage account; wait for RBAC propagation |
+| Shortcut creation fails because `connectionId` is missing or invalid | Create the ADLS Gen2 cloud connection, copy its connection ID, and pass it with `--connection-id` |
+| Shortcut creation or browsing returns **403** | Grant the organizational account used by the cloud connection **Storage Blob Data Reader** on the Challenge 2 storage account; wait for RBAC propagation |
 | Fabric **Mirroring tenant setting** disabled | Fabric admin must enable Mirroring and service principal / managed identity access in tenant settings |
 | Cosmos continuous backup / analytical store not enabled → mirrored tables empty | Enable the required Cosmos DB Mirroring prerequisites for the source account/database, then restart Mirroring |
 | Wrong **capacity ID** | Use the Fabric capacity GUID from Challenge 0, not the display name; confirm the workspace is assigned to that capacity |
 | Cross-tenant identity issues | Keep Azure subscription, Cosmos DB, storage, and Fabric workspace in the same tenant for the RVAS path |
-| Fabric API returns **202 Accepted** and item ID is missing | Creation is asynchronous; wait in Fabric until the item appears, then rerun the idempotent script |
+| Fabric asynchronous operation times out or fails | Read the operation error printed by the script, correct the underlying Fabric issue, and rerun the idempotent script |
 | `metadata` vs `resource-metadata` naming confusion | The script creates shortcut `metadata`; the README's notebook section may call the domain `resource-metadata`. Verify the actual Challenge 2 container name and keep the path consistent before Challenge 4 |
 | Mirrored table names differ from the guide | Check Cosmos DB containers from Challenge 1. Current setup script uses `conversations` and `interactions`; select `messages`/`feedback` only if those containers exist |
 

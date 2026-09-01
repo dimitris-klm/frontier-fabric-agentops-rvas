@@ -36,6 +36,7 @@ By the end of this challenge you will have:
   and `metadata`.
 - Fabric capacity ID from Challenge 0.
 - ADLS Gen2 **DFS endpoint** from Challenge 2, like `https://<account>.dfs.core.windows.net`.
+- Fabric cloud connection ID for that ADLS Gen2 endpoint, created in Step 1.
 - Cosmos DB account name and database name from Challenge 1.
 - Fabric tenant settings allow service principal / managed identity access and **Mirroring**.
 - The reference setup assets in
@@ -60,15 +61,22 @@ OneLake-managed Delta tables. Challenge 4 will use both as Bronze inputs.
 
 ## Your mission
 
-### 1. Give Fabric permission to see the landing zone
+### 1. Create the ADLS Gen2 cloud connection
 
-- Identify the workspace identity / managed identity your Fabric workspace will use for shortcuts.
-- Grant it **Storage Blob Data Reader** on the ADLS Gen2 storage account from Challenge 2.
+- Grant your organizational account **Storage Blob Data Reader** on the ADLS Gen2 storage account from
+  Challenge 2.
 - Confirm the storage account DFS endpoint and the four expected containers are available:
   `costs`, `metrics`, `logs`, and `metadata`.
+- In Fabric, open **Settings** > **Manage connections and gateways**, select **New**, and create a
+  **Cloud** connection of type **Azure Data Lake Storage Gen2**.
+- Use the storage account DFS endpoint as the server, select **Organizational account** authentication,
+  and set the privacy level to **Organizational**. If prompted for a path, use the storage account root
+  so the connection can reach all four containers.
+- Open the new connection's settings and copy its **Connection ID**. You will pass this GUID to the
+  setup script.
 
-This is the most common failure point. If Fabric cannot read the storage account, shortcuts may create
-but browsing/querying them will fail.
+This is a one-time setup. One cloud connection can authenticate all four shortcuts because they use the
+same storage account.
 
 ### 2. Create the Lakehouse and OneLake shortcuts
 
@@ -88,6 +96,7 @@ pip install -r src/setup/requirements.txt
 python src/setup/setup_fabric_workspace.py \
   --workspace-name "Observability-Analytics" \
   --storage-account-url "https://<account>.dfs.core.windows.net" \
+  --connection-id "<fabric-cloud-connection-id>" \
   --capacity-id "<fabric-capacity-id>"
 ```
 
@@ -151,9 +160,9 @@ extra egress. If the source file changes, Fabric reads the source location.
 <details>
 <summary>Granting storage access</summary>
 
-Use the storage account from Challenge 2 and grant the Fabric workspace identity / managed identity a
-data-plane role such as **Storage Blob Data Reader** at the storage-account scope. RBAC can take a few
-minutes to propagate before shortcut browsing works.
+Use the storage account from Challenge 2 and grant the organizational account used by the Fabric cloud
+connection a data-plane role such as **Storage Blob Data Reader** at the storage-account scope. RBAC can
+take a few minutes to propagate before shortcut browsing works.
 </details>
 
 <details>
@@ -168,8 +177,7 @@ uses the Fabric REST API to:
 4. Import notebooks from `resources/fabric-control-tower/fabric/notebooks/`.
 5. Import pipelines from `resources/fabric-control-tower/fabric/pipelines/`.
 
-If the Fabric API returns an async accepted response, wait for the item to finish provisioning and
-rerun the script if needed.
+The script waits for asynchronous Fabric item creation to finish before it creates dependent resources.
 </details>
 
 <details>

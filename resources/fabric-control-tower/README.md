@@ -98,7 +98,9 @@ This creates:
 
 ### 2. Configure Fabric Workspace
 
-Create the Fabric workspace, lakehouse, ADLS shortcuts, and import notebooks:
+In Fabric, create one **Azure Data Lake Storage Gen2** cloud connection for the storage account DFS
+endpoint using **Organizational account** authentication. Copy the connection ID from the connection's
+settings, then create the Fabric workspace, lakehouse, ADLS shortcuts, and import notebooks:
 
 ```bash
 pip install -r src/setup/requirements.txt
@@ -106,6 +108,7 @@ pip install -r src/setup/requirements.txt
 python src/setup/setup_fabric_workspace.py \
   --workspace-name "Observability-Analytics" \
   --storage-account-url "https://<account>.dfs.core.windows.net" \
+  --connection-id "<fabric-cloud-connection-id>" \
   --capacity-id "<fabric-capacity-id>"
 ```
 

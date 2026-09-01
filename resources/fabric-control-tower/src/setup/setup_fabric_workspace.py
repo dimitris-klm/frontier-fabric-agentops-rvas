@@ -4,6 +4,7 @@ ADLS Gen2 shortcuts, notebooks, and pipelines via the Fabric REST API.
 Usage:
     python setup_fabric_workspace.py \
         --storage-account-url https://<account>.dfs.core.windows.net \
+        --connection-id <fabric-connection-id> \
         --capacity-id <fabric-capacity-id>
 """
 
@@ -13,6 +14,7 @@ import base64
 import json
 import pathlib
 import sys
+import time
 from typing import Any
 
 import click
@@ -74,6 +76,31 @@ class FabricClient:
         resp.raise_for_status()
         return resp
 
+    def _wait_for_operation(self, response: requests.Response, timeout_seconds: int = 1200) -> dict[str, Any]:
+        """Wait for a Fabric long-running operation and return its result."""
+        operation_id = response.headers.get("x-ms-operation-id")
+        if not operation_id:
+            raise RuntimeError("Fabric returned 202 Accepted without an x-ms-operation-id header.")
+
+        operation_path = f"/operations/{operation_id}"
+        deadline = time.monotonic() + timeout_seconds
+        retry_after = int(response.headers.get("Retry-After", "5"))
+
+        while time.monotonic() < deadline:
+            time.sleep(retry_after)
+            operation_response = self._get(operation_path)
+            operation = operation_response.json()
+            status = operation.get("status")
+
+            if status == "Succeeded":
+                return self._get(f"{operation_path}/result").json()
+            if status == "Failed":
+                raise RuntimeError(f"Fabric operation {operation_id} failed: {operation.get('error')}")
+
+            retry_after = int(operation_response.headers.get("Retry-After", "5"))
+
+        raise TimeoutError(f"Fabric operation {operation_id} did not complete within {timeout_seconds} seconds.")
+
     # ------------------------------------------------------------------
     # Idempotent item helpers
     # ------------------------------------------------------------------
@@ -130,9 +157,10 @@ class FabricClient:
 
         resp = self._post(f"/workspaces/{workspace_id}/items", payload)
         if resp.status_code == 202:
-            # Long-running operation — the item is being created asynchronously.
             console.print(f"  [cyan]⏳ {item_type} '{display_name}' creation accepted (async).[/cyan]")
-            return {"displayName": display_name, "type": item_type}
+            item = self._wait_for_operation(resp)
+            console.print(f"  [green]✔  Created {item_type} '{display_name}'.[/green]")
+            return item
 
         item = resp.json()
         console.print(f"  [green]✔  Created {item_type} '{display_name}'.[/green]")
@@ -179,6 +207,7 @@ class FabricClient:
         lakehouse_id: str,
         shortcut_name: str,
         storage_account_url: str,
+        connection_id: str,
         container_name: str,
         sub_path: str = "/",
     ) -> None:
@@ -204,15 +233,10 @@ class FabricClient:
                 "adlsGen2": {
                     "location": storage_account_url,
                     "subpath": sub_path,
-                    "connectionId": None,
+                    "connectionId": connection_id,
                 },
             },
         }
-
-        # connectionId is optional when managed identity is used.
-        # Strip it out so the API can use the workspace identity.
-        if payload["target"]["adlsGen2"]["connectionId"] is None:
-            del payload["target"]["adlsGen2"]["connectionId"]
 
         try:
             self._post(path, payload)
@@ -275,14 +299,67 @@ class FabricClient:
             console.print(f"[yellow]⚠  Pipelines directory not found: {pipelines_dir}[/yellow]")
             return results
 
-        pipeline_files = sorted(pipelines_dir.glob("*.json"))
+        pipeline_files = list(pipelines_dir.glob("*.json"))
         if not pipeline_files:
             console.print("[yellow]⚠  No pipeline .json files found.[/yellow]")
             return results
 
-        for pl_path in pipeline_files:
-            display_name = pl_path.stem
-            raw_content = pl_path.read_bytes()
+        pipeline_definitions: list[tuple[pathlib.Path, dict[str, Any]]] = []
+        for pipeline_path in pipeline_files:
+            pipeline_content = json.loads(pipeline_path.read_text(encoding="utf-8"))
+            pipeline_definitions.append((pipeline_path, pipeline_content))
+
+        pipeline_definitions.sort(
+            key=lambda entry: any(
+                activity.get("type") == "ExecutePipeline"
+                for activity in entry[1].get("properties", {}).get("activities", [])
+            )
+        )
+
+        notebooks = self._list_items(workspace_id, item_type="Notebook")
+        notebooks_by_reference = {
+            reference: notebook
+            for notebook in notebooks
+            for reference in (notebook.get("displayName"), notebook.get("id"))
+            if reference
+        }
+        pipelines_by_reference = {
+            reference: pipeline
+            for pipeline in self._list_items(workspace_id, item_type="DataPipeline")
+            for reference in (pipeline.get("displayName"), pipeline.get("id"))
+            if reference
+        }
+
+        for pl_path, pipeline_content in pipeline_definitions:
+            display_name = pipeline_content.get("name", pl_path.stem)
+
+            for activity in pipeline_content.get("properties", {}).get("activities", []):
+                type_properties = activity.setdefault("typeProperties", {})
+                if activity.get("type") == "TridentNotebook":
+                    notebook_reference = type_properties.get("notebookId")
+                    notebook = notebooks_by_reference.get(notebook_reference)
+                    if not notebook:
+                        raise RuntimeError(
+                            f"Pipeline '{display_name}' references notebook '{notebook_reference}', "
+                            "but that notebook does not exist in the workspace."
+                        )
+
+                    type_properties["notebookId"] = notebook["id"]
+                    type_properties["workspaceId"] = workspace_id
+
+                if activity.get("type") == "ExecutePipeline":
+                    pipeline_reference = type_properties.get("pipeline", {}).get("referenceName")
+                    referenced_pipeline = pipelines_by_reference.get(pipeline_reference)
+                    if not referenced_pipeline:
+                        raise RuntimeError(
+                            f"Pipeline '{display_name}' references pipeline '{pipeline_reference}', "
+                            "but that pipeline does not exist in the workspace."
+                        )
+
+                    type_properties["pipeline"]["referenceName"] = referenced_pipeline["id"]
+                    type_properties["workspaceId"] = workspace_id
+
+            raw_content = json.dumps(pipeline_content).encode("utf-8")
             encoded = base64.b64encode(raw_content).decode("utf-8")
 
             definition = {
@@ -303,6 +380,9 @@ class FabricClient:
                 description=f"Imported from {pl_path.name}",
             )
             results.append(item)
+            for reference in (item.get("displayName"), item.get("id")):
+                if reference:
+                    pipelines_by_reference[reference] = item
 
         return results
 
@@ -339,11 +419,16 @@ def _print_summary(workspace: dict[str, Any], lakehouse: dict[str, Any], noteboo
     help="ADLS Gen2 storage account URL (e.g. https://<account>.dfs.core.windows.net).",
 )
 @click.option(
+    "--connection-id",
+    required=True,
+    help="Fabric cloud connection ID for the ADLS Gen2 storage account.",
+)
+@click.option(
     "--capacity-id",
     required=True,
     help="Fabric capacity ID to assign the workspace to.",
 )
-def main(workspace_name: str, storage_account_url: str, capacity_id: str) -> None:
+def main(workspace_name: str, storage_account_url: str, connection_id: str, capacity_id: str) -> None:
     """Provision a Microsoft Fabric workspace for observability analytics.
 
     Creates a workspace, Lakehouse, ADLS Gen2 shortcuts, and imports
@@ -374,6 +459,7 @@ def main(workspace_name: str, storage_account_url: str, capacity_id: str) -> Non
                         lakehouse_id=lakehouse_id,
                         shortcut_name=container,
                         storage_account_url=storage_account_url,
+                        connection_id=connection_id,
                         container_name=container,
                         sub_path=f"/{container}",
                     )
