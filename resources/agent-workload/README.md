@@ -181,16 +181,34 @@ Content-Type: application/json
 
 ```json
 {
-  "role": "assistant",
-  "content": "Observability in distributed systems refers to...",
-  "timestamp": "2024-01-15T10:32:05Z",
-  "usage": {
-    "prompt_tokens": 128,
-    "completion_tokens": 256,
-    "total_tokens": 384
+  "userMessage": {
+    "id": "message-user-123",
+    "conversationId": "conv-abc123",
+    "sessionId": "session-abc123",
+    "role": "user",
+    "content": "Explain observability in distributed systems.",
+    "timestamp": "2024-01-15T10:32:01Z",
+    "status": "accepted"
+  },
+  "assistantMessage": {
+    "id": "message-assistant-456",
+    "conversationId": "conv-abc123",
+    "sessionId": "session-abc123",
+    "role": "assistant",
+    "content": "Observability in distributed systems refers to...",
+    "timestamp": "2024-01-15T10:32:05Z",
+    "model": "gpt-5-mini",
+    "promptTokens": 128,
+    "completionTokens": 256,
+    "totalTokens": 384,
+    "durationMs": 1834.7,
+    "status": "succeeded"
   }
 }
 ```
+
+Both message documents are persisted to the Cosmos DB `interactions` container. The assistant
+document carries the model-usage fields consumed by Fabric Mirroring and downstream agent analytics.
 
 #### Health Check (Backend)
 
@@ -231,7 +249,8 @@ Content-Type: application/json
     "prompt_tokens": 64,
     "completion_tokens": 200
   },
-  "model": "gpt-5-mini"
+  "model": "gpt-5-mini",
+  "duration_ms": 1412.6
 }
 ```
 
