@@ -42,9 +42,16 @@ class SendMessageRequest(BaseModel):
 class Message(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     conversationId: str
+    sessionId: str
     role: str
     content: str
     timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    model: str | None = None
+    promptTokens: int | None = None
+    completionTokens: int | None = None
+    totalTokens: int | None = None
+    durationMs: float | None = None
+    status: str | None = None
 
 
 class Conversation(BaseModel):
@@ -160,9 +167,19 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         logger.exception("Failed to verify conversation")
         raise HTTPException(status_code=500, detail=str(exc))
 
-    user_message = Message(conversationId=conversation_id, role=request.role, content=request.content)
+    conversation = items[0]
+    session_id = conversation["sessionId"]
+    user_message = Message(
+        conversationId=conversation_id,
+        sessionId=session_id,
+        role=request.role,
+        content=request.content,
+        status="accepted",
+    )
     try:
-        await app.state.interactions_container.create_item(body=user_message.model_dump())
+        await app.state.interactions_container.create_item(
+            body=user_message.model_dump(exclude_none=True)
+        )
     except Exception as exc:
         logger.exception("Failed to store user message")
         raise HTTPException(status_code=500, detail=str(exc))
@@ -185,21 +202,41 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         logger.exception("Failed to call agent service")
         raise HTTPException(status_code=502, detail=f"Agent service unavailable: {exc}")
 
-    assistant_message = Message(conversationId=conversation_id, role="assistant", content=agent_content)
+    usage = agent_data.get("usage") or {}
+    prompt_tokens = usage.get("prompt_tokens")
+    completion_tokens = usage.get("completion_tokens")
+    total_tokens = (
+        prompt_tokens + completion_tokens
+        if prompt_tokens is not None and completion_tokens is not None
+        else None
+    )
+    assistant_message = Message(
+        conversationId=conversation_id,
+        sessionId=session_id,
+        role="assistant",
+        content=agent_content,
+        model=agent_data.get("model"),
+        promptTokens=prompt_tokens,
+        completionTokens=completion_tokens,
+        totalTokens=total_tokens,
+        durationMs=agent_data.get("duration_ms"),
+        status="succeeded",
+    )
     try:
-        await app.state.interactions_container.create_item(body=assistant_message.model_dump())
+        await app.state.interactions_container.create_item(
+            body=assistant_message.model_dump(exclude_none=True)
+        )
     except Exception as exc:
         logger.exception("Failed to store assistant message")
         raise HTTPException(status_code=500, detail=str(exc))
 
     try:
-        conversation = items[0]
         conversation["updatedAt"] = datetime.now(timezone.utc).isoformat()
         await app.state.conversations_container.upsert_item(body=conversation)
     except Exception as exc:
         logger.warning("Failed to update conversation timestamp: %s", exc)
 
     return {
-        "userMessage": user_message.model_dump(),
-        "assistantMessage": assistant_message.model_dump(),
+        "userMessage": user_message.model_dump(exclude_none=True),
+        "assistantMessage": assistant_message.model_dump(exclude_none=True),
     }
