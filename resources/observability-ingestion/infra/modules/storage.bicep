@@ -12,10 +12,7 @@ param fabricWorkspaceIdentityPrincipalId string
 
 var containers = [
   'costs'
-  'metrics'
-  'logs'
   'metadata'
-  'diagnostics'
 ]
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {

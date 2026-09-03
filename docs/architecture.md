@@ -88,12 +88,12 @@ enforces a consistent event schema across agents.
 
 The control plane and Azure Monitor feed a single landing zone:
 
-| Source | Container | Format | Cadence |
+| Source | Physical container | Format | Cadence |
 |---|---|---|---|
 | Azure Cost Management | `costs` | FOCUS Parquet (Snappy) | Daily |
 | Azure Resource Graph | `metadata` | Parquet | Daily |
-| Log Analytics data export | `metrics`, `logs` | JSON | Continuous |
-| Diagnostic settings | `diagnostics` | JSON | Continuous |
+| Log Analytics data export | One `am-*` container per exported table | Newline-delimited JSON | Continuous |
+| Diagnostic settings | Azure-created `insights-*` containers | JSON | Continuous |
 
 All land in **ADLS Gen2** with hierarchical namespace and date-partitioned paths for efficient Spark
 reads.

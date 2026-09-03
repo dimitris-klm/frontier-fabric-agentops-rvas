@@ -86,9 +86,9 @@ metadata into ADLS Gen2 so Fabric can shortcut to it in later challenges.</p>
 │           │                    │                      │             │
 │  ┌────────┴────────────────────┴──────────────────────┴──────────┐  │
 │  │                   ADLS Gen2 Storage Account                   │  │
-│  │  ┌───────┐ ┌────────┐ ┌──────┐ ┌──────────┐ ┌─────────────┐ │  │
-│  │  │ costs │ │metrics │ │ logs │ │ metadata │ │ diagnostics │ │  │
-│  │  └───────┘ └────────┘ └──────┘ └──────────┘ └─────────────┘ │  │
+│  │  ┌───────┐ ┌──────────┐ ┌──────────┐ ┌───────────────────┐ │  │
+│  │  │ costs │ │ metadata │ │   am-*   │ │    insights-*     │ │  │
+│  │  └───────┘ └──────────┘ └──────────┘ └───────────────────┘ │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │  ┌─────────────────────┐                                           │
@@ -104,7 +104,7 @@ metadata into ADLS Gen2 so Fabric can shortcut to it in later challenges.</p>
 <h3 id="data-flows">Data Flows<a class="anchor" href="#data-flows" aria-hidden="true">#</a></h3>
 <div class="table-wrap"><table><thead><tr>
 <th>Source</th>
-<th>Container</th>
+<th>Physical container</th>
 <th>Format</th>
 <th>Schedule</th>
 </tr>
@@ -122,17 +122,22 @@ metadata into ADLS Gen2 so Fabric can shortcut to it in later challenges.</p>
 </tr>
 <tr>
 <td>Log Analytics Data Export</td>
-<td><code>metrics</code>, <code>logs</code></td>
-<td>JSON</td>
+<td>One <code>am-*</code> container per exported table</td>
+<td>Newline-delimited JSON</td>
 <td>Continuous</td>
 </tr>
 <tr>
 <td>Diagnostic Settings</td>
-<td><code>diagnostics</code></td>
+<td>Azure-created <code>insights-*</code> containers</td>
 <td>JSON</td>
 <td>Continuous</td>
 </tr>
 </tbody></table></div>
+<p>Only <code>costs</code> and <code>metadata</code> are created by this component. Log Analytics data export creates physical
+containers such as <code>am-apprequests</code>, <code>am-appdependencies</code>, and <code>am-appmetrics</code> when those tables emit
+new records after the export rule is enabled. Diagnostic settings similarly create containers such
+as <code>insights-logs-audit</code> and <code>insights-metrics-pt1m</code>; Azure does not write to a single
+<code>diagnostics</code> container.</p>
 <h2 id="prerequisites">Prerequisites<a class="anchor" href="#prerequisites" aria-hidden="true">#</a></h2>
 <ul>
 <li><a href="https://learn.microsoft.com/cli/azure/install-azure-cli" target="_blank" rel="noopener">Azure CLI</a> v2.60+</li>
@@ -198,7 +203,7 @@ python -m pip install -r requirements.txt</code></pre>
 <p>Diagnostic settings for the reused Log Analytics workspace are deployed by Bicep. No setup script is
 required.</p>
 <h3 id="validate-exports">Validate Exports<a class="anchor" href="#validate-exports" aria-hidden="true">#</a></h3>
-<p>Inspects storage containers and reports on ingested data:</p>
+<p>Discovers <code>costs</code>, <code>metadata</code>, <code>am-*</code>, and <code>insights-*</code> containers and reports on ingested data:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python validate_exports.py \
   --storage-account &lt;STORAGE_ACCOUNT_NAME&gt;</code></pre>
 <h2 id="data-format-reference">Data Format Reference<a class="anchor" href="#data-format-reference" aria-hidden="true">#</a></h2>
@@ -298,24 +303,24 @@ required.</p>
 │   └── focus/
 │       └── &lt;yyyyMMdd-yyyyMMdd&gt;/
 │           └── *.parquet          # FOCUS cost data
-├── metrics/
-│   └── am-&lt;workspace&gt;/
-│       └── AppMetrics/
-│           └── y=*/m=*/d=*/h=*/  # Log Analytics metrics export
-├── logs/
-│   └── am-&lt;workspace&gt;/
-│       └── App*/
-│           └── y=*/m=*/d=*/h=*/  # Log Analytics log export
 ├── metadata/
 │   └── resource-graph/
 │       └── year=*/month=*/day=*/
 │           ├── all_resources_with_tags_*.parquet
 │           ├── resource_counts_by_type_*.parquet
 │           └── resources_by_location_*.parquet
-└── diagnostics/
-    └── insights-*/
-        └── resourceId=*/
-            └── y=*/m=*/d=*/h=*/  # Diagnostic settings output</code></pre>
+├── am-apprequests/
+│   └── .../PT5M.json             # Log Analytics AppRequests export
+├── am-appdependencies/
+│   └── .../PT5M.json             # Log Analytics AppDependencies export
+├── am-appmetrics/
+│   └── .../PT5M.json             # Log Analytics AppMetrics export
+├── am-apptraces/ and am-appexceptions/
+│   └── .../PT5M.json             # Created when those tables emit records
+├── insights-logs-audit/
+│   └── resourceId=*/...          # Diagnostic settings log output
+└── insights-metrics-pt1m/
+  └── resourceId=*/...          # Diagnostic settings metric output</code></pre>
 <h2 id="integration-with-the-fabric-control-tower">Integration with the Fabric Control Tower<a class="anchor" href="#integration-with-the-fabric-control-tower" aria-hidden="true">#</a></h2>
 <p>This landing zone is the data source for the <strong><a href="../fabric-control-tower/README.html">Fabric Control Tower</a></strong> you connect in <strong><a href="../../challenges/challenge-03-onelake-foundation.html">Challenge 3</a></strong>. The ADLS Gen2 storage account serves as a OneLake shortcut target:</p>
 <ol>

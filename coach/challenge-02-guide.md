@@ -8,18 +8,19 @@
 |---|---|
 | **Est. time** | 1.5–2 h |
 | **Difficulty** | ⭐⭐ (200) |
-| **They build** | ADLS Gen2 landing zone for cost, metrics, logs, metadata, and diagnostics |
+| **They build** | ADLS Gen2 landing zone for cost, metadata, Log Analytics exports, and diagnostics |
 | **Key services** | ADLS Gen2, Azure Cost Management, Resource Graph, Log Analytics data export, Diagnostic Settings |
 
 ## Coaching objectives
 
 This challenge turns scattered Azure signals into a single **landing zone** that Fabric can read with
-OneLake shortcuts. Keep teams focused on the outcome: five domains landing in storage with enough
-proof that Challenge 3 can shortcut to them.
+OneLake shortcuts. Keep teams focused on the outcome: managed `costs` and `metadata` containers plus
+Azure-created `am-*` and `insights-*` export containers with enough proof that Challenge 3 can
+shortcut to them.
 
-**What good looks like:** the team shows the five containers, validates FOCUS and Resource Graph
-Parquet, confirms the Log Analytics export rule, applies diagnostic settings to supported resources,
-and records the storage account name, resource ID, and DFS endpoint.
+**What good looks like:** the team validates FOCUS and Resource Graph Parquet, shows the physical
+`am-*` and `insights-*` containers created by Azure, confirms the Log Analytics export rule and
+diagnostic setting, and records the storage account name, resource ID, and DFS endpoint.
 
 ## The reference path
 
@@ -117,15 +118,18 @@ python validate_exports.py \
 
 Ask the team to show:
 
-1. **Storage account** with hierarchical namespace enabled and containers:
-   `costs`, `metrics`, `logs`, `metadata`, `diagnostics`.
+1. **Storage account** with hierarchical namespace enabled and managed containers `costs` and
+  `metadata`.
 2. **FOCUS cost Parquet** under `costs/focus/...` after trigger/wait.
 3. **Resource Graph Parquet** under `metadata/resource-graph/year=*/month=*/day=*/`.
 4. **Log Analytics data export** enabled for `AppRequests`, `AppDependencies`, `AppTraces`,
    `AppExceptions`, and `AppMetrics`.
-5. **Diagnostic setting** on the reused Log Analytics workspace targets storage and Log Analytics.
-6. `validate_exports.py` output with file counts, sizes, latest timestamps, and sample schemas.
-7. Recorded Fabric coordinates:
+5. Azure-created **Log Analytics containers** such as `am-apprequests`, `am-appdependencies`, and
+  `am-appmetrics` after fresh Challenge 1 traffic.
+6. Azure-created **diagnostic containers** with `insights-*` names after platform telemetry is emitted.
+7. **Diagnostic setting** on the reused Log Analytics workspace targets storage and Log Analytics.
+8. `validate_exports.py` output with file counts, sizes, latest timestamps, and sample schemas.
+9. Recorded Fabric coordinates:
    - storage account name
    - storage account resource ID
    - `https://<storage-account>.dfs.core.windows.net`
@@ -145,7 +149,8 @@ shortcut to it.
 | Expecting Log Analytics export to backfill | Data export is continuous from enablement forward; generate Challenge 1 traffic after enabling it |
 | Assuming data export requires a dedicated cluster | It does not for this reference path; verify the rule is enabled and treat it as continuous export |
 | Storage access denied from scripts | Ensure the caller/identity has Storage Blob Data Contributor on the storage account or resource group |
-| No metrics/log files yet | Confirm the data export rule is enabled, traffic exists in the workspace, and allow time for export latency |
+| Expected `am-*` container is absent | Confirm the data export rule is enabled, generate fresh Challenge 1 traffic, and allow time for export latency; data export does not backfill |
+| Expected `insights-*` container is absent | Confirm the diagnostic setting is enabled and wait for the corresponding platform log or metric category to emit data |
 
 ## Talking points (mini-briefing)
 
@@ -164,7 +169,7 @@ shortcut to it.
 
 - Add tags (`team`, `agent`, `environment`, `costCenter`) to Challenge 1 resources, rerun Resource
   Graph export, and prove tags appear in Parquet.
-- Generate more agent traffic and watch the `metrics` / `logs` containers grow.
+- Generate more agent traffic and watch the relevant `am-*` containers grow.
 - Compare `ResourceId` in FOCUS with `id` in Resource Graph and sketch the future `dim_resource` join.
 - Review [`docs/architecture.md`](../docs/architecture.md) Gold tables and map which raw container
   feeds each one.
@@ -173,7 +178,7 @@ shortcut to it.
 
 - [`resources/observability-ingestion/README.md`](../resources/observability-ingestion/README.md) — deployment, data layout, script usage
 - [`resources/observability-ingestion/infra/main.bicep`](../resources/observability-ingestion/infra/main.bicep) — outputs and resource naming
-- [`resources/observability-ingestion/infra/modules/storage.bicep`](../resources/observability-ingestion/infra/modules/storage.bicep) — five containers and ADLS Gen2 settings
+- [`resources/observability-ingestion/infra/modules/storage.bicep`](../resources/observability-ingestion/infra/modules/storage.bicep) — managed containers and ADLS Gen2 settings
 - [`resources/observability-ingestion/infra/modules/monitoring.bicep`](../resources/observability-ingestion/infra/modules/monitoring.bicep) — Log Analytics data export tables
 - [`resources/observability-ingestion/infra/modules/cost-export.bicep`](../resources/observability-ingestion/infra/modules/cost-export.bicep) — FOCUS Parquet export
 - [`resources/observability-ingestion/src/scripts/`](../resources/observability-ingestion/src/scripts/) — Resource Graph export and validation
