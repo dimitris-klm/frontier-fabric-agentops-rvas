@@ -76,7 +76,7 @@
 </tr>
 <tr>
 <td><strong>They build</strong></td>
-<td>ADLS Gen2 landing zone for cost, metrics, logs, metadata, and diagnostics</td>
+<td>ADLS Gen2 landing zone for cost, metadata, Log Analytics exports, and diagnostics</td>
 </tr>
 <tr>
 <td><strong>Key services</strong></td>
@@ -85,11 +85,12 @@
 </tbody></table></div>
 <h2 id="coaching-objectives">Coaching objectives<a class="anchor" href="#coaching-objectives" aria-hidden="true">#</a></h2>
 <p>This challenge turns scattered Azure signals into a single <strong>landing zone</strong> that Fabric can read with
-OneLake shortcuts. Keep teams focused on the outcome: five domains landing in storage with enough
-proof that Challenge 3 can shortcut to them.</p>
-<p><strong>What good looks like:</strong> the team shows the five containers, validates FOCUS and Resource Graph
-Parquet, confirms the Log Analytics export rule, applies diagnostic settings to supported resources,
-and records the storage account name, resource ID, and DFS endpoint.</p>
+OneLake shortcuts. Keep teams focused on the outcome: managed <code>costs</code> and <code>metadata</code> containers plus
+Azure-created <code>am-*</code> and <code>insights-*</code> export containers with enough proof that Challenge 3 can
+shortcut to them.</p>
+<p><strong>What good looks like:</strong> the team validates FOCUS and Resource Graph Parquet, shows the physical
+<code>am-*</code> and <code>insights-*</code> containers created by Azure, confirms the Log Analytics export rule and
+diagnostic setting, and records the storage account name, resource ID, and DFS endpoint.</p>
 <h2 id="the-reference-path">The reference path<a class="anchor" href="#the-reference-path" aria-hidden="true">#</a></h2>
 <p>Prepare the persistent Fabric identity before deployment:</p>
 <ol>
@@ -144,12 +145,15 @@ az rest --method post \
 <h2 id="checkpoint-verification">Checkpoint verification<a class="anchor" href="#checkpoint-verification" aria-hidden="true">#</a></h2>
 <p>Ask the team to show:</p>
 <ol>
-<li><strong>Storage account</strong> with hierarchical namespace enabled and containers:
-<code>costs</code>, <code>metrics</code>, <code>logs</code>, <code>metadata</code>, <code>diagnostics</code>.</li>
+<li><strong>Storage account</strong> with hierarchical namespace enabled and managed containers <code>costs</code> and
+  <code>metadata</code>.</li>
 <li><strong>FOCUS cost Parquet</strong> under <code>costs/focus/...</code> after trigger/wait.</li>
 <li><strong>Resource Graph Parquet</strong> under <code>metadata/resource-graph/year=*/month=*/day=*/</code>.</li>
 <li><strong>Log Analytics data export</strong> enabled for <code>AppRequests</code>, <code>AppDependencies</code>, <code>AppTraces</code>,
 <code>AppExceptions</code>, and <code>AppMetrics</code>.</li>
+<li>Azure-created <strong>Log Analytics containers</strong> such as <code>am-apprequests</code>, <code>am-appdependencies</code>, and
+  <code>am-appmetrics</code> after fresh Challenge 1 traffic.</li>
+<li>Azure-created <strong>diagnostic containers</strong> with <code>insights-*</code> names after platform telemetry is emitted.</li>
 <li><strong>Diagnostic setting</strong> on the reused Log Analytics workspace targets storage and Log Analytics.</li>
 <li><code>validate_exports.py</code> output with file counts, sizes, latest timestamps, and sample schemas.</li>
 <li>Recorded Fabric coordinates:<ul>
@@ -199,8 +203,12 @@ shortcut to it.</p>
 <td>Ensure the caller/identity has Storage Blob Data Contributor on the storage account or resource group</td>
 </tr>
 <tr>
-<td>No metrics/log files yet</td>
-<td>Confirm the data export rule is enabled, traffic exists in the workspace, and allow time for export latency</td>
+<td>Expected <code>am-*</code> container is absent</td>
+<td>Confirm the data export rule is enabled, generate fresh Challenge 1 traffic, and allow time for export latency; data export does not backfill</td>
+</tr>
+<tr>
+<td>Expected <code>insights-*</code> container is absent</td>
+<td>Confirm the diagnostic setting is enabled and wait for the corresponding platform log or metric category to emit data</td>
 </tr>
 </tbody></table></div>
 <h2 id="talking-points-mini-briefing">Talking points (mini-briefing)<a class="anchor" href="#talking-points-mini-briefing" aria-hidden="true">#</a></h2>
@@ -220,7 +228,7 @@ no data copy.</li>
 <ul>
 <li>Add tags (<code>team</code>, <code>agent</code>, <code>environment</code>, <code>costCenter</code>) to Challenge 1 resources, rerun Resource
 Graph export, and prove tags appear in Parquet.</li>
-<li>Generate more agent traffic and watch the <code>metrics</code> / <code>logs</code> containers grow.</li>
+<li>Generate more agent traffic and watch the relevant <code>am-*</code> containers grow.</li>
 <li>Compare <code>ResourceId</code> in FOCUS with <code>id</code> in Resource Graph and sketch the future <code>dim_resource</code> join.</li>
 <li>Review <a href="../docs/architecture.html"><code>docs/architecture.md</code></a> Gold tables and map which raw container
 feeds each one.</li>
@@ -229,7 +237,7 @@ feeds each one.</li>
 <ul>
 <li><a href="../resources/observability-ingestion/README.html"><code>resources/observability-ingestion/README.md</code></a> — deployment, data layout, script usage</li>
 <li><a href="../code.html?path=resources%2Fobservability-ingestion%2Finfra%2Fmain.bicep"><code>resources/observability-ingestion/infra/main.bicep</code></a> — outputs and resource naming</li>
-<li><a href="../code.html?path=resources%2Fobservability-ingestion%2Finfra%2Fmodules%2Fstorage.bicep"><code>resources/observability-ingestion/infra/modules/storage.bicep</code></a> — five containers and ADLS Gen2 settings</li>
+<li><a href="../code.html?path=resources%2Fobservability-ingestion%2Finfra%2Fmodules%2Fstorage.bicep"><code>resources/observability-ingestion/infra/modules/storage.bicep</code></a> — managed containers and ADLS Gen2 settings</li>
 <li><a href="../code.html?path=resources%2Fobservability-ingestion%2Finfra%2Fmodules%2Fmonitoring.bicep"><code>resources/observability-ingestion/infra/modules/monitoring.bicep</code></a> — Log Analytics data export tables</li>
 <li><a href="../code.html?path=resources%2Fobservability-ingestion%2Finfra%2Fmodules%2Fcost-export.bicep"><code>resources/observability-ingestion/infra/modules/cost-export.bicep</code></a> — FOCUS Parquet export</li>
 <li><a href="../resources/observability-ingestion/README.html"><code>resources/observability-ingestion/src/scripts/</code></a> — Resource Graph export and validation</li>

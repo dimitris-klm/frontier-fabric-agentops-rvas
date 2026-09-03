@@ -22,9 +22,9 @@ This component provisions the **landing zone** of the AgentOps Control Tower:
 │           │                    │                      │             │
 │  ┌────────┴────────────────────┴──────────────────────┴──────────┐  │
 │  │                   ADLS Gen2 Storage Account                   │  │
-│  │  ┌───────┐ ┌────────┐ ┌──────┐ ┌──────────┐ ┌─────────────┐ │  │
-│  │  │ costs │ │metrics │ │ logs │ │ metadata │ │ diagnostics │ │  │
-│  │  └───────┘ └────────┘ └──────┘ └──────────┘ └─────────────┘ │  │
+│  │  ┌───────┐ ┌──────────┐ ┌──────────┐ ┌───────────────────┐ │  │
+│  │  │ costs │ │ metadata │ │   am-*   │ │    insights-*     │ │  │
+│  │  └───────┘ └──────────┘ └──────────┘ └───────────────────┘ │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │  ┌─────────────────────┐                                           │
@@ -41,12 +41,18 @@ This component provisions the **landing zone** of the AgentOps Control Tower:
 
 ### Data Flows
 
-| Source | Container | Format | Schedule |
+| Source | Physical container | Format | Schedule |
 |---|---|---|---|
 | Azure Cost Management | `costs` | FOCUS Parquet (Snappy) | Daily |
 | Azure Resource Graph | `metadata` | Parquet (Snappy) | One-time lab seed |
-| Log Analytics Data Export | `metrics`, `logs` | JSON | Continuous |
-| Diagnostic Settings | `diagnostics` | JSON | Continuous |
+| Log Analytics Data Export | One `am-*` container per exported table | Newline-delimited JSON | Continuous |
+| Diagnostic Settings | Azure-created `insights-*` containers | JSON | Continuous |
+
+Only `costs` and `metadata` are created by this component. Log Analytics data export creates physical
+containers such as `am-apprequests`, `am-appdependencies`, and `am-appmetrics` when those tables emit
+new records after the export rule is enabled. Diagnostic settings similarly create containers such
+as `insights-logs-audit` and `insights-metrics-pt1m`; Azure does not write to a single
+`diagnostics` container.
 
 ## Prerequisites
 
@@ -148,7 +154,7 @@ required.
 
 ### Validate Exports
 
-Inspects storage containers and reports on ingested data:
+Discovers `costs`, `metadata`, `am-*`, and `insights-*` containers and reports on ingested data:
 
 ```bash
 python validate_exports.py \
@@ -196,24 +202,24 @@ Exported by `resource_graph_export.py`:
 │   └── focus/
 │       └── <yyyyMMdd-yyyyMMdd>/
 │           └── *.parquet          # FOCUS cost data
-├── metrics/
-│   └── am-<workspace>/
-│       └── AppMetrics/
-│           └── y=*/m=*/d=*/h=*/  # Log Analytics metrics export
-├── logs/
-│   └── am-<workspace>/
-│       └── App*/
-│           └── y=*/m=*/d=*/h=*/  # Log Analytics log export
 ├── metadata/
 │   └── resource-graph/
 │       └── year=*/month=*/day=*/
 │           ├── all_resources_with_tags_*.parquet
 │           ├── resource_counts_by_type_*.parquet
 │           └── resources_by_location_*.parquet
-└── diagnostics/
-    └── insights-*/
-        └── resourceId=*/
-            └── y=*/m=*/d=*/h=*/  # Diagnostic settings output
+├── am-apprequests/
+│   └── .../PT5M.json             # Log Analytics AppRequests export
+├── am-appdependencies/
+│   └── .../PT5M.json             # Log Analytics AppDependencies export
+├── am-appmetrics/
+│   └── .../PT5M.json             # Log Analytics AppMetrics export
+├── am-apptraces/ and am-appexceptions/
+│   └── .../PT5M.json             # Created when those tables emit records
+├── insights-logs-audit/
+│   └── resourceId=*/...          # Diagnostic settings log output
+└── insights-metrics-pt1m/
+  └── resourceId=*/...          # Diagnostic settings metric output
 ```
 
 ## Integration with the Fabric Control Tower

@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reference Architecture — AgentOps Control Tower (Fabric Edition) · Frontier Fabric AgentOps RVAS</title>
-  <meta name="description" content="This document describes the end-to-end architecture your team will build during the RVAS. Use
-it as your north star: every challenge stands up one slice of this picture.">
+  <meta name="description" content="Reference Architecture — AgentOps Control Tower (Fabric Edition)">
   <link rel="icon" type="image/png" href="../assets/logos/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -140,7 +139,7 @@ enforces a consistent event schema across agents.</p>
 <p>The control plane and Azure Monitor feed a single landing zone:</p>
 <div class="table-wrap"><table><thead><tr>
 <th>Source</th>
-<th>Container</th>
+<th>Physical container</th>
 <th>Format</th>
 <th>Cadence</th>
 </tr>
@@ -158,13 +157,13 @@ enforces a consistent event schema across agents.</p>
 </tr>
 <tr>
 <td>Log Analytics data export</td>
-<td><code>metrics</code>, <code>logs</code></td>
-<td>JSON</td>
+<td>One <code>am-*</code> container per exported table</td>
+<td>Newline-delimited JSON</td>
 <td>Continuous</td>
 </tr>
 <tr>
 <td>Diagnostic settings</td>
-<td><code>diagnostics</code></td>
+<td>Azure-created <code>insights-*</code> containers</td>
 <td>JSON</td>
 <td>Continuous</td>
 </tr>

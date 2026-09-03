@@ -19,8 +19,9 @@ performance later.
 By the end of this challenge you will have:
 
 - Deployed the observability ingestion infrastructure in [`resources/observability-ingestion/`](../resources/observability-ingestion/).
-- Created an **ADLS Gen2** storage account with five landing containers:
-  `costs`, `metrics`, `logs`, `metadata`, and `diagnostics`.
+- Created an **ADLS Gen2** storage account with managed `costs` and `metadata` containers.
+- Observed Azure-created `am-*` containers for Log Analytics data export and `insights-*`
+  containers for diagnostic settings.
 - Enabled **Log Analytics data export** so application telemetry flows continuously to storage.
 - Configured **Cost Management FOCUS** export for FinOps-ready Parquet cost data.
 - Exported **Azure Resource Graph** metadata and tags to Parquet.
@@ -42,13 +43,12 @@ By the end of this challenge you will have:
 
 The provided ingestion layer lands four Azure signal families into one ADLS Gen2 account:
 
-| Source | Container | Format | Cadence |
+| Source | Physical container | Format | Cadence |
 |---|---|---|---|
 | Azure Cost Management | `costs` | FOCUS Parquet (Snappy) | Daily / triggered |
-| Log Analytics data export | `metrics` | JSON | Continuous |
-| Log Analytics data export | `logs` | JSON | Continuous |
+| Log Analytics data export | `am-appmetrics`, `am-apprequests`, `am-appdependencies`, `am-apptraces`, `am-appexceptions` | Newline-delimited JSON | Continuous |
 | Azure Resource Graph | `metadata` | Parquet (Snappy) | On demand / scheduled |
-| Diagnostic settings | `diagnostics` | JSON | Continuous |
+| Diagnostic settings | `insights-*` containers such as `insights-logs-audit` and `insights-metrics-pt1m` | JSON | Continuous |
 
 That storage account becomes the **OneLake shortcut target** in Challenge 3. Treat its name, resource
 ID, and DFS endpoint as mission-critical coordinates.
@@ -57,7 +57,7 @@ ID, and DFS endpoint as mission-critical coordinates.
 Azure Monitor + Cost + Resource Graph + Diagnostics
                          │
                          ▼
-ADLS Gen2 landing zone: costs · metrics · logs · metadata · diagnostics
+ADLS Gen2 landing zone: costs · metadata · am-* · insights-*
                          │
                          ▼
 Challenge 3: Fabric Lakehouse + OneLake shortcuts
@@ -91,16 +91,19 @@ account. The identity will be used by Fabric connections and notebooks in the fo
 - Provision the ingestion stack from [`resources/observability-ingestion/`](../resources/observability-ingestion/).
 - Confirm the deployment creates:
   - ADLS Gen2 storage with hierarchical namespace enabled
-  - Five containers: `costs`, `metrics`, `logs`, `metadata`, `diagnostics`
+  - Managed `costs` and `metadata` containers
   - A data export rule on the existing Challenge 1 Log Analytics workspace
   - Cost Management FOCUS export
+- Generate fresh Challenge 1 traffic after deployment so Log Analytics data export creates the
+  relevant physical `am-*` containers.
 - Capture the outputs for the storage account and Log Analytics workspace.
 
 ### 3. Verify platform diagnostics
 
 - Confirm the Bicep deployment created a diagnostic setting on the reused Log Analytics workspace.
 - Verify that its platform logs and metrics target both the landing-zone storage account and the
-  Log Analytics workspace. No separate diagnostic setup script is required.
+  Log Analytics workspace. Azure writes this data to physical `insights-*` containers; there is no
+  single `diagnostics` container. No separate diagnostic setup script is required.
 
 ### 4. Land cost and resource metadata
 
@@ -113,13 +116,15 @@ account. The identity will be used by Fabric connections and notebooks in the fo
 
 ### 5. Validate the data lake
 
-- Inspect all five containers and confirm files are appearing where expected.
+- Inspect the managed and Azure-created containers and confirm files are appearing where expected.
 - Validate file counts, total sizes, latest timestamps, and sample Parquet schemas.
 - Pay special attention to:
   - `costs/focus/...` — FOCUS Parquet
   - `metadata/resource-graph/...` — Resource Graph Parquet
-  - `metrics/...` and `logs/...` — Log Analytics exports
-  - `diagnostics/...` — diagnostic settings output
+  - `am-apprequests`, `am-appdependencies`, and `am-appmetrics` — Challenge 1 telemetry exported
+    from Log Analytics
+  - Other `am-*` containers — exported tables that have produced records after export was enabled
+  - `insights-*` containers — diagnostic settings output
 
 ### 6. Record the coordinates for Fabric
 
@@ -137,16 +142,19 @@ Challenge 3 depends on these values to create OneLake shortcuts without copying 
 
 - [ ] Fabric workspace identity exists and its Object ID is stored in the selected `azd` environment
 - [ ] ADLS Gen2 storage exists with hierarchical namespace enabled
-- [ ] All five containers exist: `costs`, `metrics`, `logs`, `metadata`, `diagnostics`
+- [ ] Managed `costs` and `metadata` containers exist
 - [ ] FOCUS cost Parquet is present in `costs` and validated
 - [ ] Resource Graph metadata Parquet is present in `metadata`
 - [ ] Log Analytics data export rule is enabled for app request/dependency/trace/exception/metric tables
-- [ ] The Log Analytics workspace diagnostic setting targets storage and Log Analytics
+- [ ] Azure-created `am-*` containers contain the Challenge 1 tables that have emitted post-enable telemetry
+- [ ] The Log Analytics workspace diagnostic setting targets storage and Log Analytics, with output
+  appearing in `insights-*` containers after platform telemetry is emitted
 - [ ] `validate_exports.py` reports file counts, sizes, latest timestamps, and schemas
 - [ ] The team has recorded the storage account name, resource ID, and DFS endpoint URL
 
-> 🧭 **Checkpoint:** show your coach the five containers, one FOCUS Parquet file, one Resource Graph
-> Parquet file, the active Log Analytics export rule, and your recorded Fabric shortcut coordinates.
+> 🧭 **Checkpoint:** show your coach the `costs` and `metadata` containers, the Azure-created
+> `am-*` and `insights-*` containers, one FOCUS Parquet file, one Resource Graph Parquet file, the
+> active Log Analytics export rule, and your recorded Fabric shortcut coordinates.
 
 ## Hints
 
@@ -212,8 +220,9 @@ python validate_exports.py \
   --storage-account <STORAGE_ACCOUNT_NAME>
 ```
 
-Empty containers are useful evidence too: they usually mean an export has not run yet, no traffic has
-arrived, or a diagnostic setting has not emitted data.
+The validator discovers physical `am-*` and `insights-*` containers automatically. If an expected
+Azure-created container is absent, the corresponding export may not have emitted data yet; generate
+fresh traffic or wait for diagnostic output, then run the validator again.
 </details>
 
 <details>
