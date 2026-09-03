@@ -2,7 +2,7 @@
 
 > **Part of the [Frontier Fabric AgentOps RVAS](../../README.md).** This is the telemetry
 > **source** you deploy in **[Challenge 1](../../challenges/challenge-01-agent-telemetry.md)** — a
-> full-stack Azure AI Foundry agent that emits the traces, custom token/cost metrics, and
+> full-stack Azure AI Foundry agent that emits backend-origin traces, custom token and latency metrics, and
 > conversation data the Control Tower later correlates.
 
 <!-- Badges -->
@@ -11,13 +11,15 @@
 ![Node.js](https://img.shields.io/badge/Node.js-20-green)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-> Full-stack AI agent runtime with end-to-end observability — from user click to model inference.
+> Full-stack AI agent runtime with application observability from the backend to model inference.
 
 ---
 
 ## Architecture Overview
 
-The **Agents Runtime** is the core execution block of the observability platform. It processes requests across three microservices, persists data, and emits telemetry at every layer.
+The **Agents Runtime** is the core execution block of the observability platform. It processes
+requests across three microservices and persists conversation data. Application telemetry begins at
+the backend; the frontend is not instrumented in this reference workload.
 
 | Component | Role |
 |---|---|
@@ -25,7 +27,7 @@ The **Agents Runtime** is the core execution block of the observability platform
 | **Azure Container Apps** | Hosts three microservices — frontend, backend, and agent — in a shared managed environment with built-in autoscaling. |
 | **Azure API Management** | Provisions API definitions and policies for future gateway integration; it is not in the reference application's active request path. |
 | **Azure Cosmos DB** | Stores conversations, individual interactions, and agent configuration using a serverless throughput model. |
-| **Application Insights** | Full-stack telemetry — distributed traces, live metrics, dependency maps, and custom counters for token usage. |
+| **Application Insights** | Backend and agent request traces, dependency maps, and custom token and latency metrics. |
 
 ### Architecture Diagram
 
@@ -34,7 +36,7 @@ User → Frontend (Next.js) → Backend (FastAPI) → Agent (FastAPI) → Azure 
                 │
                 └→ Cosmos DB (agentsdb)
 
-Frontend + Backend + Agent → Application Insights
+Backend + Agent → Application Insights
 
 API Management is provisioned for future gateway integration but is not in this active path.
 ```
@@ -69,8 +71,8 @@ azd up
 
 Docker must be running. `azd up` is the normal path when containers can download packages from npm
 and PyPI. If a restricted network blocks local container package downloads, run `azd provision`,
-build the `agent`, `backend`, and `frontend` images with `az acr build`, and attach them with
-`az containerapp update`. See the Challenge 1 coach guide for the exact fallback commands.
+build the `agent`, `backend`, and `frontend` images as `latest` with `az acr build`, and attach them
+with new Container Apps revisions. See the Challenge 1 coach guide for the exact fallback commands.
 
 After deployment completes, `azd` prints the service URLs:
 
@@ -79,6 +81,9 @@ After deployment completes, `azd` prints the service URLs:
   backend   https://backend.<env>.<region>.azurecontainerapps.io
   agent     https://agent.<env>.<region>.azurecontainerapps.io
 ```
+
+Run `azd env get-values` and record the Application Insights, Log Analytics, and Cosmos DB
+coordinates for the following challenge.
 
 ---
 
@@ -305,6 +310,7 @@ GET /api/health
 | `COSMOS_DATABASE` | Cosmos DB database name (default: `agentsdb`) | No |
 | `AGENT_SERVICE_URL` | Internal URL of the agent service | Yes |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Application Insights connection string for telemetry | Yes |
+| `OTEL_SERVICE_NAME` | Application Insights cloud role name (set to `<environment>-backend`) | Yes |
 | `AZURE_CLIENT_ID` | Managed identity client ID for Cosmos DB authentication | Yes |
 | `PORT` | Server port (default: `8000`) | No |
 
@@ -315,6 +321,7 @@ GET /api/health
 | `AZURE_OPENAI_ENDPOINT` | Azure AI Foundry / OpenAI endpoint URL | Yes |
 | `AZURE_OPENAI_DEPLOYMENT` | Model deployment name (default: `gpt-5-mini`) | Yes |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Application Insights connection string for telemetry | Yes |
+| `OTEL_SERVICE_NAME` | Application Insights cloud role name (set to `<environment>-agent`) | Yes |
 | `AZURE_CLIENT_ID` | Managed identity client ID for Azure OpenAI authentication | Yes |
 | `PORT` | Server port (default: `8001`) | No |
 
@@ -323,7 +330,6 @@ GET /api/health
 | Variable | Description | Required |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | Backend API base URL resolved by the frontend's runtime `/api/config` route | Yes |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Application Insights connection string for telemetry | No |
 | `PORT` | Server port (default: `3000`) | No |
 
 ---
@@ -381,20 +387,23 @@ The frontend is available at `http://localhost:3000`.
 
 ### Application Insights Integration
 
-All three services emit telemetry through the **Azure Monitor OpenTelemetry SDK**. Traces, metrics, and logs are collected automatically and correlated across service boundaries.
+Application telemetry begins at the backend. The backend and agent use the **Azure Monitor
+OpenTelemetry SDK** for inbound requests, outbound HTTP dependencies, Azure SDK dependencies, and
+custom metrics. The frontend is not instrumented.
 
 #### Distributed Tracing
 
-Every inbound HTTP request generates a trace that flows through the entire call chain:
+Inbound backend requests create trace context that flows through the instrumented service chain:
 
 ```
-Frontend → APIM → Backend → Agent → Azure OpenAI
+Backend → Agent → Azure OpenAI
+  └────────────→ Cosmos DB
 ```
 
-Each span in the trace includes:
+Request and dependency spans include:
 - HTTP method, URL, and status code
 - Duration and dependency details
-- Custom attributes (conversation ID, model name, token counts)
+- Operation and trace correlation identifiers
 
 **View traces:** Azure Portal → Application Insights → Transaction search → filter by operation name.
 
@@ -428,22 +437,31 @@ Monitor real-time request rates, failure rates, and dependency durations during 
 
 #### Log Analytics (KQL)
 
-Query structured logs across all services:
+Confirm named backend and agent requests:
 
 ```kql
-// End-to-end latency for agent invocations
-requests
-| where name == "POST /api/agent/invoke"
-| summarize avg(duration), percentile(duration, 95) by bin(timestamp, 5m)
-| render timechart
+AppRequests
+| where TimeGenerated > ago(30m)
+| project TimeGenerated, AppRoleName, Name, OperationId, ResultCode, Success
+| order by TimeGenerated desc
 ```
 
+Confirm correlated service, model, and Cosmos DB dependencies:
+
 ```kql
-// Token usage over time
-customMetrics
-| where name == "agent.tokens.completion"
-| summarize sum(value) by bin(timestamp, 1h)
-| render columnchart
+AppDependencies
+| where TimeGenerated > ago(30m)
+| project TimeGenerated, AppRoleName, Name, Target, OperationId, ResultCode, Success
+| order by TimeGenerated desc
+```
+
+Confirm token and latency metrics:
+
+```kql
+AppMetrics
+| where TimeGenerated > ago(30m) and Name startswith "agent."
+| summarize Value=sum(Sum) by Name, bin(TimeGenerated, 5m)
+| order by TimeGenerated desc
 ```
 
 ### Cosmos DB Query Metrics
@@ -480,7 +498,7 @@ The infrastructure is defined in Bicep modules under `infra/`:
 | `container-apps.bicep` | ACR, Container Apps Environment, three Container Apps, scaling rules, and ACR pull assignment |
 | `cosmos-db.bicep` | Cosmos DB account (serverless), `agentsdb` database, `conversations` and `interactions` containers with partition keys |
 | `api-management.bicep` | APIM instance, API definitions, and rate-limit/CORS policies for future gateway integration |
-| `monitoring.bicep` | Log Analytics workspace, Application Insights instance, diagnostic settings for all resources |
+| `monitoring.bicep` | Log Analytics workspace and workspace-based Application Insights instance |
 
 ---
 

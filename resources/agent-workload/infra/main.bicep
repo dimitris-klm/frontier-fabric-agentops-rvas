@@ -199,6 +199,8 @@ output AZURE_OPENAI_DEPLOYMENT string = openAiModelName
 @secure()
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.applicationInsightsConnectionString
 output APPLICATIONINSIGHTS_NAME string = monitoring.outputs.applicationInsightsName
+output AZURE_LOG_ANALYTICS_WORKSPACE_NAME string = monitoring.outputs.logAnalyticsWorkspaceName
+output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = monitoring.outputs.logAnalyticsWorkspaceId
 output AZURE_APIM_GATEWAY_URL string = apiManagement.outputs.apimGatewayUrl
 output FRONTEND_FQDN string = containerApps.outputs.frontendFqdn
 output BACKEND_FQDN string = containerApps.outputs.backendFqdn

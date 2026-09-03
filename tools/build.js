@@ -18,7 +18,7 @@ const REPO = 'microsoft/frontier-fabric-agentops-rvas';
 const REPO_URL = `https://github.com/${REPO}`;
 const BLOB = `${REPO_URL}/blob/main`;
 const SITE_TITLE = 'Frontier Fabric AgentOps RVAS';
-const EXCLUDE_DIRS = new Set(['.git', '.agents', '.azure', '__pycache__', 'node_modules', 'tools']);
+const EXCLUDE_DIRS = new Set(['.git', '.agents', '.azure', '.venv', '__pycache__', 'node_modules', 'tools']);
 
 const CAT_LABEL = { challenges: 'Challenges', coach: 'Coach', docs: 'Docs', resources: 'Resources', root: 'Home' };
 

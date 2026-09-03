@@ -193,6 +193,10 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: applicationInsightsConnectionString
             }
             {
+              name: 'OTEL_SERVICE_NAME'
+              value: '${environmentName}-backend'
+            }
+            {
               name: 'AZURE_CLIENT_ID'
               value: managedIdentityClientId
             }
@@ -266,6 +270,10 @@ resource agentApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
               value: applicationInsightsConnectionString
+            }
+            {
+              name: 'OTEL_SERVICE_NAME'
+              value: '${environmentName}-agent'
             }
             {
               name: 'AZURE_CLIENT_ID'
