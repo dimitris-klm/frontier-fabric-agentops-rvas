@@ -13,6 +13,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from opentelemetry import metrics
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from openai import AzureOpenAI
 from pydantic import BaseModel, Field
 
@@ -29,6 +31,12 @@ SYSTEM_MESSAGE = (
 )
 
 COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default"
+
+if APPLICATIONINSIGHTS_CONNECTION_STRING:
+    configure_azure_monitor(
+        connection_string=APPLICATIONINSIGHTS_CONNECTION_STRING,
+    )
+    HTTPXClientInstrumentor().instrument()
 
 meter = metrics.get_meter("agentops")
 invocations_metric = meter.create_counter(
@@ -110,9 +118,6 @@ def _build_messages(request: AgentRequest) -> list[dict]:
 async def lifespan(app: FastAPI):
     logger.info("Agent service starting up")
     if APPLICATIONINSIGHTS_CONNECTION_STRING:
-        configure_azure_monitor(
-            connection_string=APPLICATIONINSIGHTS_CONNECTION_STRING,
-        )
         logger.info("Azure Monitor telemetry configured")
     else:
         logger.warning("APPLICATIONINSIGHTS_CONNECTION_STRING not set; telemetry disabled")
@@ -121,6 +126,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Agent Service", version="1.0.0", lifespan=lifespan)
+
+if APPLICATIONINSIGHTS_CONNECTION_STRING:
+    FastAPIInstrumentor.instrument_app(app)
 
 app.add_middleware(
     CORSMiddleware,

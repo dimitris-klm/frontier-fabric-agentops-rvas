@@ -14,11 +14,13 @@
 ## Coaching objectives
 
 The point is **not** "deploy an app" — it's understanding **what telemetry the Control Tower will
-later consume and why**. Make sure teams can trace a single user message across every hop and can
-name the custom token/cost metric. That mental model pays off in Challenges 4 and 5.
+later consume and why**. Make sure teams can trace a single user message from the backend through
+the agent and can name the custom token and latency metrics. That mental model pays off in later
+challenges.
 
-**What good looks like:** the team shows an end-to-end transaction (backend → agent → model +
-Cosmos), points at a token metric, and finds their conversations in Cosmos DB. APIM is provisioned,
+**What good looks like:** the team shows a correlated transaction (backend → agent → model, with
+Cosmos operations), points at token and latency metrics, and finds their conversations in Cosmos DB.
+Application telemetry begins at the backend; the frontend is not instrumented. APIM is provisioned,
 but it is not in the reference application's active request path.
 
 ## The reference path
@@ -33,7 +35,8 @@ azd up        # env name, region (same as Challenge 0), subscription
 - `azd up` provisions Container Apps env + 3 apps, APIM, Cosmos DB (serverless), Azure AI Services +
   model deployment, Log Analytics + Application Insights, and managed identities with role
   assignments. Expect **10–20 min**.
-- Outputs include the **frontend/backend/agent URLs**.
+- Outputs include the **frontend/backend/agent URLs** plus the Application Insights and Log Analytics
+  workspace coordinates.
 
 On networks that block package downloads from Docker containers, `azd up` can fail during local
 packaging. Keep Docker running for the `azd` prerequisite check, then use this fallback:
@@ -42,15 +45,15 @@ packaging. Keep Docker running for the `azd` prerequisite check, then use this f
 azd provision
 ACR=$(az acr list -g "$AZURE_RESOURCE_GROUP" --query '[0].name' -o tsv)
 LOGIN_SERVER=$(az acr show -n "$ACR" --query loginServer -o tsv)
-TAG="deploy-$(date +%Y%m%d%H%M)"
+REVISION="r$(date +%Y%m%d%H%M%S)"
 
-az acr build -r "$ACR" -t "agent:$TAG" -f src/agent/Dockerfile src/agent
-az acr build -r "$ACR" -t "backend:$TAG" -f src/backend/Dockerfile src/backend
-az acr build -r "$ACR" -t "frontend:$TAG" -f src/frontend/Dockerfile src/frontend
+az acr build -r "$ACR" -t "agent:latest" -f src/agent/Dockerfile src/agent
+az acr build -r "$ACR" -t "backend:latest" -f src/backend/Dockerfile src/backend
+az acr build -r "$ACR" -t "frontend:latest" -f src/frontend/Dockerfile src/frontend
 
-az containerapp update -g "$AZURE_RESOURCE_GROUP" -n "$AZURE_ENV_NAME-agent" --image "$LOGIN_SERVER/agent:$TAG"
-az containerapp update -g "$AZURE_RESOURCE_GROUP" -n "$AZURE_ENV_NAME-backend" --image "$LOGIN_SERVER/backend:$TAG"
-az containerapp update -g "$AZURE_RESOURCE_GROUP" -n "$AZURE_ENV_NAME-frontend" --image "$LOGIN_SERVER/frontend:$TAG"
+az containerapp update -g "$AZURE_RESOURCE_GROUP" -n "$AZURE_ENV_NAME-agent" --image "$LOGIN_SERVER/agent:latest" --revision-suffix "$REVISION"
+az containerapp update -g "$AZURE_RESOURCE_GROUP" -n "$AZURE_ENV_NAME-backend" --image "$LOGIN_SERVER/backend:latest" --revision-suffix "$REVISION"
+az containerapp update -g "$AZURE_RESOURCE_GROUP" -n "$AZURE_ENV_NAME-frontend" --image "$LOGIN_SERVER/frontend:latest" --revision-suffix "$REVISION"
 ```
 
 The frontend build can print an `npm ci` `EUSAGE` error because the repository has no
@@ -68,32 +71,48 @@ for i in $(seq 1 20); do
 done
 ```
 
-Show telemetry in **Application Insights** (this workload's resource):
+Show telemetry in **Application Insights** (this workload's resource). Application telemetry begins
+at the backend:
 
-- **Transaction search** → recent `POST /api/...` → **end-to-end transaction details** → waterfall
-  across services + Cosmos DB + Azure OpenAI.
-- **Application map** → services + dependencies, with latency/volume on hover.
-- **Metrics / Logs** → custom token metrics:
+- **Transaction search** → recent backend `POST /api/...` → **end-to-end transaction details** →
+  correlated backend, agent, Azure OpenAI, and Cosmos DB operations.
+- **Application map** → backend and agent plus dependencies, with latency/volume on hover.
+- **Logs** → verify requests, dependencies, and custom metrics independently:
   ```kql
-  customMetrics
-  | where name startswith "agent."
-  | summarize sum(value) by name, bin(timestamp, 5m)
-  | render timechart
+  AppRequests
+  | where TimeGenerated > ago(30m)
+  | summarize Count=count() by AppRoleName, Name, ResultCode, Success
+  ```
+  ```kql
+  AppDependencies
+  | where TimeGenerated > ago(30m)
+  | summarize Count=count() by AppRoleName, Name, Target, ResultCode, Success
+  ```
+  ```kql
+  AppMetrics
+  | where TimeGenerated > ago(30m) and Name startswith "agent."
+  | summarize Value=sum(Sum) by Name, bin(TimeGenerated, 5m)
   ```
 
 Show **Cosmos DB → Data Explorer** → `agentsdb` → `conversations` / `interactions`; note the
-partition key (`conversation_id`). This is the data mirrored in Challenge 3.
+partition keys (`/sessionId` for `conversations`, `/conversationId` for `interactions`). This is the
+data mirrored in Challenge 3.
+
+Record the handoff values shown by `azd env get-values`, including
+`AZURE_LOG_ANALYTICS_WORKSPACE_NAME` and `AZURE_LOG_ANALYTICS_WORKSPACE_ID`.
 
 ## Checkpoint verification
 
 Have the team walk you through **one** message:
 
-1. The request in **Transaction search** with the backend → agent → model/Cosmos waterfall.
-2. The **Application Map** dependencies.
-3. A **custom token/cost metric** plotted or queried.
+1. The request in **Transaction search** with correlated backend → agent → model/Cosmos operations.
+2. The **Application Map** showing named backend and agent services plus dependencies.
+3. Non-empty `AppRequests`, `AppDependencies`, and agent `AppMetrics` query results.
 4. The matching **conversation** document in Cosmos DB.
+5. The recorded Log Analytics workspace name and resource ID.
 
-✅ Pass when all four are shown and they've recorded the App Insights + Cosmos resource names.
+✅ Pass when all five are shown and they've recorded the App Insights, Log Analytics, and Cosmos
+resource coordinates.
 
 ## Common pitfalls & fixes
 
@@ -106,13 +125,15 @@ Have the team walk you through **one** message:
 | Frontend ACR build prints `npm ci` `EUSAGE` | Expected without `package-lock.json`; verify the fallback `npm install` succeeds and the ACR run reports `Succeeded` |
 | **No telemetry** in App Insights | `APPLICATIONINSIGHTS_CONNECTION_STRING` not set on the app, or no traffic yet — redeploy/restart and generate requests |
 | Cosmos **403** from backend | Cosmos DB data-plane role assignment missing/propagating; check managed identity client id env |
-| Can't find custom metrics | They live under a **custom metric namespace**; query `customMetrics` in Logs to confirm names (`agent.tokens.*`, `agent.duration_ms`) |
+| `AppRoleName` is `unknown_service` | Confirm `OTEL_SERVICE_NAME` is set on the backend and agent Container Apps, then deploy a new revision |
+| Requests exist but backend → agent or agent → model is absent | Confirm `opentelemetry-instrumentation-httpx` is installed in both images and deploy new revisions |
+| Can't find custom metrics | Query `AppMetrics` in Logs to confirm names (`agent.tokens.*`, `agent.duration_ms`) |
 
 ## Talking points (mini-briefing)
 
-- **Every active service hop is observable.** Distributed tracing connects backend → agent → model
-  and Cosmos so you can attribute latency and errors precisely. APIM integration remains a future
-  hardening opportunity.
+- **Application telemetry begins at the backend.** Distributed tracing connects backend → agent →
+  model and Cosmos so you can attribute latency and errors precisely. Frontend and APIM telemetry
+  remain future hardening opportunities.
 - **Managed identity everywhere** — no secrets; auth is Entra + RBAC. This is also how Fabric will
   reach the data later.
 - **Tokens = money.** The custom token metric is the seed of cost-per-request and FinOps chargeback
@@ -124,11 +145,9 @@ Have the team walk you through **one** message:
 
 - Script sustained load and watch **Container Apps autoscale** (Scale and replicas).
 - Explore **APIM Analytics** (rate limiting, PTU-aware load balancing) as future Control Tower input.
-- Read the [`observability-sdk`](../resources/observability-sdk/) and map its event schema
-  (AgentStart/Step/ExternalCall/End/Error) to what they see in App Insights.
+- Compare synchronous and streaming agent calls in `AppRequests`, `AppDependencies`, and `AppMetrics`.
 
 ## Reference assets
 
 - [`resources/agent-workload/README.md`](../resources/agent-workload/README.md) — full service/API/monitoring detail
 - [`resources/agent-workload/infra/`](../resources/agent-workload/infra/) — Bicep modules
-- [`resources/observability-sdk/`](../resources/observability-sdk/) — telemetry contract

@@ -9,6 +9,8 @@ from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,7 @@ if APPLICATIONINSIGHTS_CONNECTION_STRING:
     from azure.monitor.opentelemetry import configure_azure_monitor
 
     configure_azure_monitor(connection_string=APPLICATIONINSIGHTS_CONNECTION_STRING)
+    HTTPXClientInstrumentor().instrument()
 
 
 # ---------------------------------------------------------------------------
@@ -85,6 +88,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Observability Demo Backend", lifespan=lifespan)
+
+if APPLICATIONINSIGHTS_CONNECTION_STRING:
+    FastAPIInstrumentor.instrument_app(app)
 
 app.add_middleware(
     CORSMiddleware,

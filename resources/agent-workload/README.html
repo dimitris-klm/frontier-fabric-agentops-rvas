@@ -79,7 +79,7 @@
 <blockquote>
 <p><strong>Part of the <a href="../../README.html">Frontier Fabric AgentOps RVAS</a>.</strong> This is the telemetry
 <strong>source</strong> you deploy in <strong><a href="../../challenges/challenge-01-agent-telemetry.html">Challenge 1</a></strong> — a
-full-stack Azure AI Foundry agent that emits the traces, custom token/cost metrics, and
+full-stack Azure AI Foundry agent that emits backend-origin traces, custom token and latency metrics, and
 conversation data the Control Tower later correlates.</p>
 </blockquote>
 <!-- Badges -->
@@ -88,11 +88,13 @@ conversation data the Control Tower later correlates.</p>
 <img src="https://img.shields.io/badge/Node.js-20-green" alt="Node.js">
 <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></p>
 <blockquote>
-<p>Full-stack AI agent runtime with end-to-end observability — from user click to model inference.</p>
+<p>Full-stack AI agent runtime with application observability from the backend to model inference.</p>
 </blockquote>
 <hr>
 <h2 id="architecture-overview">Architecture Overview<a class="anchor" href="#architecture-overview" aria-hidden="true">#</a></h2>
-<p>The <strong>Agents Runtime</strong> is the core execution block of the observability platform. It processes requests across three microservices, persists data, and emits telemetry at every layer.</p>
+<p>The <strong>Agents Runtime</strong> is the core execution block of the observability platform. It processes
+requests across three microservices and persists conversation data. Application telemetry begins at
+the backend; the frontend is not instrumented in this reference workload.</p>
 <div class="table-wrap"><table><thead><tr>
 <th>Component</th>
 <th>Role</th>
@@ -115,7 +117,7 @@ conversation data the Control Tower later correlates.</p>
 </tr>
 <tr>
 <td><strong>Application Insights</strong></td>
-<td>Full-stack telemetry — distributed traces, live metrics, dependency maps, and custom counters for token usage.</td>
+<td>Backend and agent request traces, dependency maps, and custom token and latency metrics.</td>
 </tr>
 </tbody></table></div>
 <h3 id="architecture-diagram">Architecture Diagram<a class="anchor" href="#architecture-diagram" aria-hidden="true">#</a></h3>
@@ -123,7 +125,7 @@ conversation data the Control Tower later correlates.</p>
                 │
                 └→ Cosmos DB (agentsdb)
 
-Frontend + Backend + Agent → Application Insights
+Backend + Agent → Application Insights
 
 API Management is provisioned for future gateway integration but is not in this active path.</code></pre>
 <hr>
@@ -176,12 +178,14 @@ azd init
 azd up</code></pre>
 <p>Docker must be running. <code>azd up</code> is the normal path when containers can download packages from npm
 and PyPI. If a restricted network blocks local container package downloads, run <code>azd provision</code>,
-build the <code>agent</code>, <code>backend</code>, and <code>frontend</code> images with <code>az acr build</code>, and attach them with
-<code>az containerapp update</code>. See the Challenge 1 coach guide for the exact fallback commands.</p>
+build the <code>agent</code>, <code>backend</code>, and <code>frontend</code> images as <code>latest</code> with <code>az acr build</code>, and attach them
+with new Container Apps revisions. See the Challenge 1 coach guide for the exact fallback commands.</p>
 <p>After deployment completes, <code>azd</code> prints the service URLs:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>  frontend  https://frontend.&lt;env&gt;.&lt;region&gt;.azurecontainerapps.io
   backend   https://backend.&lt;env&gt;.&lt;region&gt;.azurecontainerapps.io
   agent     https://agent.&lt;env&gt;.&lt;region&gt;.azurecontainerapps.io</code></pre>
+<p>Run <code>azd env get-values</code> and record the Application Insights, Log Analytics, and Cosmos DB
+coordinates for the following challenge.</p>
 <hr>
 <h2 id="services">Services<a class="anchor" href="#services" aria-hidden="true">#</a></h2>
 <h3 id="frontend-—-srcfrontend">Frontend — <code>src/frontend</code><a class="anchor" href="#frontend-—-srcfrontend" aria-hidden="true">#</a></h3>
@@ -286,15 +290,32 @@ Content-Type: application/json
 }</code></pre>
 <p><strong>Response</strong> <code>200 OK</code></p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-json">{
-  &quot;role&quot;: &quot;assistant&quot;,
-  &quot;content&quot;: &quot;Observability in distributed systems refers to...&quot;,
-  &quot;timestamp&quot;: &quot;2024-01-15T10:32:05Z&quot;,
-  &quot;usage&quot;: {
-    &quot;prompt_tokens&quot;: 128,
-    &quot;completion_tokens&quot;: 256,
-    &quot;total_tokens&quot;: 384
+  &quot;userMessage&quot;: {
+    &quot;id&quot;: &quot;message-user-123&quot;,
+    &quot;conversationId&quot;: &quot;conv-abc123&quot;,
+    &quot;sessionId&quot;: &quot;session-abc123&quot;,
+    &quot;role&quot;: &quot;user&quot;,
+    &quot;content&quot;: &quot;Explain observability in distributed systems.&quot;,
+    &quot;timestamp&quot;: &quot;2024-01-15T10:32:01Z&quot;,
+    &quot;status&quot;: &quot;accepted&quot;
+  },
+  &quot;assistantMessage&quot;: {
+    &quot;id&quot;: &quot;message-assistant-456&quot;,
+    &quot;conversationId&quot;: &quot;conv-abc123&quot;,
+    &quot;sessionId&quot;: &quot;session-abc123&quot;,
+    &quot;role&quot;: &quot;assistant&quot;,
+    &quot;content&quot;: &quot;Observability in distributed systems refers to...&quot;,
+    &quot;timestamp&quot;: &quot;2024-01-15T10:32:05Z&quot;,
+    &quot;model&quot;: &quot;gpt-5-mini&quot;,
+    &quot;promptTokens&quot;: 128,
+    &quot;completionTokens&quot;: 256,
+    &quot;totalTokens&quot;: 384,
+    &quot;durationMs&quot;: 1834.7,
+    &quot;status&quot;: &quot;succeeded&quot;
   }
 }</code></pre>
+<p>Both message documents are persisted to the Cosmos DB <code>interactions</code> container. The assistant
+document carries the model-usage fields consumed by Fabric Mirroring and downstream agent analytics.</p>
 <h4 id="health-check-backend">Health Check (Backend)</h4>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-http">GET /api/health</code></pre>
 <p><strong>Response</strong> <code>200 OK</code></p>
@@ -319,7 +340,8 @@ Content-Type: application/json
     &quot;prompt_tokens&quot;: 64,
     &quot;completion_tokens&quot;: 200
   },
-  &quot;model&quot;: &quot;gpt-5-mini&quot;
+  &quot;model&quot;: &quot;gpt-5-mini&quot;,
+  &quot;duration_ms&quot;: 1412.6
 }</code></pre>
 <h4 id="invoke-agent-streaming">Invoke Agent (Streaming)</h4>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-http">POST /api/agent/stream
@@ -373,6 +395,11 @@ data: {&quot;type&quot;: &quot;done&quot;, &quot;usage&quot;: {&quot;prompt_toke
 <td>Yes</td>
 </tr>
 <tr>
+<td><code>OTEL_SERVICE_NAME</code></td>
+<td>Application Insights cloud role name (set to <code>&lt;environment&gt;-backend</code>)</td>
+<td>Yes</td>
+</tr>
+<tr>
 <td><code>AZURE_CLIENT_ID</code></td>
 <td>Managed identity client ID for Cosmos DB authentication</td>
 <td>Yes</td>
@@ -405,6 +432,11 @@ data: {&quot;type&quot;: &quot;done&quot;, &quot;usage&quot;: {&quot;prompt_toke
 <td>Yes</td>
 </tr>
 <tr>
+<td><code>OTEL_SERVICE_NAME</code></td>
+<td>Application Insights cloud role name (set to <code>&lt;environment&gt;-agent</code>)</td>
+<td>Yes</td>
+</tr>
+<tr>
 <td><code>AZURE_CLIENT_ID</code></td>
 <td>Managed identity client ID for Azure OpenAI authentication</td>
 <td>Yes</td>
@@ -425,11 +457,6 @@ data: {&quot;type&quot;: &quot;done&quot;, &quot;usage&quot;: {&quot;prompt_toke
 <td><code>NEXT_PUBLIC_API_URL</code></td>
 <td>Backend API base URL resolved by the frontend&#39;s runtime <code>/api/config</code> route</td>
 <td>Yes</td>
-</tr>
-<tr>
-<td><code>APPLICATIONINSIGHTS_CONNECTION_STRING</code></td>
-<td>Application Insights connection string for telemetry</td>
-<td>No</td>
 </tr>
 <tr>
 <td><code>PORT</code></td>
@@ -474,15 +501,18 @@ npm run dev</code></pre>
 <hr>
 <h2 id="monitoring-observability">Monitoring &amp; Observability<a class="anchor" href="#monitoring-observability" aria-hidden="true">#</a></h2>
 <h3 id="application-insights-integration">Application Insights Integration<a class="anchor" href="#application-insights-integration" aria-hidden="true">#</a></h3>
-<p>All three services emit telemetry through the <strong>Azure Monitor OpenTelemetry SDK</strong>. Traces, metrics, and logs are collected automatically and correlated across service boundaries.</p>
+<p>Application telemetry begins at the backend. The backend and agent use the <strong>Azure Monitor
+OpenTelemetry SDK</strong> for inbound requests, outbound HTTP dependencies, Azure SDK dependencies, and
+custom metrics. The frontend is not instrumented.</p>
 <h4 id="distributed-tracing">Distributed Tracing</h4>
-<p>Every inbound HTTP request generates a trace that flows through the entire call chain:</p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>Frontend → APIM → Backend → Agent → Azure OpenAI</code></pre>
-<p>Each span in the trace includes:</p>
+<p>Inbound backend requests create trace context that flows through the instrumented service chain:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>Backend → Agent → Azure OpenAI
+  └────────────→ Cosmos DB</code></pre>
+<p>Request and dependency spans include:</p>
 <ul>
 <li>HTTP method, URL, and status code</li>
 <li>Duration and dependency details</li>
-<li>Custom attributes (conversation ID, model name, token counts)</li>
+<li>Operation and trace correlation identifiers</li>
 </ul>
 <p><strong>View traces:</strong> Azure Portal → Application Insights → Transaction search → filter by operation name.</p>
 <h4 id="application-map">Application Map</h4>
@@ -521,17 +551,21 @@ npm run dev</code></pre>
 <p>Monitor real-time request rates, failure rates, and dependency durations during the RVAS.</p>
 <p><strong>View live metrics:</strong> Azure Portal → Application Insights → Live metrics.</p>
 <h4 id="log-analytics-kql">Log Analytics (KQL)</h4>
-<p>Query structured logs across all services:</p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-kql">// End-to-end latency for agent invocations
-requests
-| where name == &quot;POST /api/agent/invoke&quot;
-| summarize avg(duration), percentile(duration, 95) by bin(timestamp, 5m)
-| render timechart</code></pre>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-kql">// Token usage over time
-customMetrics
-| where name == &quot;agent.tokens.completion&quot;
-| summarize sum(value) by bin(timestamp, 1h)
-| render columnchart</code></pre>
+<p>Confirm named backend and agent requests:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-kql">AppRequests
+| where TimeGenerated &gt; ago(30m)
+| project TimeGenerated, AppRoleName, Name, OperationId, ResultCode, Success
+| order by TimeGenerated desc</code></pre>
+<p>Confirm correlated service, model, and Cosmos DB dependencies:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-kql">AppDependencies
+| where TimeGenerated &gt; ago(30m)
+| project TimeGenerated, AppRoleName, Name, Target, OperationId, ResultCode, Success
+| order by TimeGenerated desc</code></pre>
+<p>Confirm token and latency metrics:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-kql">AppMetrics
+| where TimeGenerated &gt; ago(30m) and Name startswith &quot;agent.&quot;
+| summarize Value=sum(Sum) by Name, bin(TimeGenerated, 5m)
+| order by TimeGenerated desc</code></pre>
 <h3 id="cosmos-db-query-metrics">Cosmos DB Query Metrics<a class="anchor" href="#cosmos-db-query-metrics" aria-hidden="true">#</a></h3>
 <p>Cosmos DB request units (RU) and latency are captured as dependency telemetry in Application Insights. Filter dependencies by type <code>Azure DocumentDB</code> to analyze:</p>
 <ul>
@@ -575,7 +609,7 @@ will remain empty until clients are explicitly routed through the APIM gateway.<
 </tr>
 <tr>
 <td><code>monitoring.bicep</code></td>
-<td>Log Analytics workspace, Application Insights instance, diagnostic settings for all resources</td>
+<td>Log Analytics workspace and workspace-based Application Insights instance</td>
 </tr>
 </tbody></table></div>
 <hr>

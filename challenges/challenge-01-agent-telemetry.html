@@ -76,15 +76,16 @@ telemetry at every hop</strong>. Today you bring the customer&#39;s agent worklo
 is flowing.</p>
 </blockquote>
 <p>This is the <strong>source</strong> of everything the Control Tower will eventually correlate: traces, custom
-token/cost metrics, and conversation records. Get it emitting cleanly and the rest of the platform
+token and latency metrics, and conversation records. Get it emitting cleanly and the rest of the platform
 has something real to chew on.</p>
 <h2 id="objectives">Objectives<a class="anchor" href="#objectives" aria-hidden="true">#</a></h2>
 <p>By the end of this challenge you will have:</p>
 <ul>
 <li>Deployed a full-stack <strong>Azure AI Foundry</strong> agent workload to Azure.</li>
 <li>Generated real agent traffic through the frontend → backend → agent → model path.</li>
-<li>Confirmed <strong>distributed traces</strong> connect every hop in Application Insights.</li>
-<li>Found the <strong>custom token/cost metrics</strong> the agent emits.</li>
+<li>Confirmed <strong>distributed traces</strong> connect the backend, agent, model, and Cosmos DB operations in
+Application Insights.</li>
+<li>Found the <strong>custom token and latency metrics</strong> the agent emits.</li>
 <li>Seen conversations land in <strong>Cosmos DB</strong> (the data the Control Tower will later mirror).</li>
 </ul>
 <h2 id="prerequisites">Prerequisites<a class="anchor" href="#prerequisites" aria-hidden="true">#</a></h2>
@@ -99,14 +100,16 @@ reference application currently calls the Container Apps directly:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>User → Frontend (Next.js) → Backend (FastAPI) → Agent (FastAPI) → Azure AI Foundry
                                   │
                                   └→ Cosmos DB (conversations &amp; interactions)</code></pre>
-<p>Everything is instrumented with the Azure Monitor OpenTelemetry SDK, and the agent records custom
-metrics for token usage and latency.</p>
+<p>Application telemetry begins at the backend. The backend and agent are instrumented with the Azure
+Monitor OpenTelemetry SDK, and the agent records custom metrics for token usage and latency. The
+frontend provides the user experience but does not emit Application Insights telemetry in this
+reference workload.</p>
 <h2 id="your-mission">Your mission<a class="anchor" href="#your-mission" aria-hidden="true">#</a></h2>
 <h3 id="1-deploy-the-workload">1. Deploy the workload<a class="anchor" href="#1-deploy-the-workload" aria-hidden="true">#</a></h3>
 <ul>
 <li>Provision and deploy the agent stack to your chosen region using the provided infrastructure.</li>
-<li>Capture the output <strong>service URLs</strong> (frontend, backend, agent) and the names of the Application
-Insights and Cosmos DB resources.</li>
+<li>Capture the output <strong>service URLs</strong> (frontend, backend, agent), the Application Insights and Cosmos
+DB resource names, and the Log Analytics workspace name and resource ID.</li>
 </ul>
 <h3 id="2-make-the-agent-work-for-its-telemetry">2. Make the agent work for its telemetry<a class="anchor" href="#2-make-the-agent-work-for-its-telemetry" aria-hidden="true">#</a></h3>
 <ul>
@@ -118,25 +121,27 @@ volume.)</li>
 <h3 id="3-prove-the-signal-is-flowing">3. Prove the signal is flowing<a class="anchor" href="#3-prove-the-signal-is-flowing" aria-hidden="true">#</a></h3>
 <p>Using Application Insights for this workload, demonstrate <strong>all</strong> of the following:</p>
 <ul>
-<li>A <strong>distributed trace</strong> (end-to-end transaction) that shows the request flowing across the
-services and out to the model and Cosmos DB.</li>
-<li>The <strong>Application Map</strong>, showing the services and their dependencies (Cosmos DB, Azure OpenAI).</li>
-<li>The <strong>custom metrics</strong> the agent emits for <strong>token consumption</strong> (and/or latency) — and explain to
+<li>A <strong>distributed trace</strong> that starts at the backend and shows the request flowing through the agent
+to Azure OpenAI, alongside the correlated Cosmos DB operations.</li>
+<li>The <strong>Application Map</strong>, showing the backend and agent services plus their Cosmos DB and Azure
+OpenAI dependencies.</li>
+<li>The <strong>custom metrics</strong> the agent emits for <strong>token consumption and latency</strong> — and explain to
 a teammate what they&#39;ll be worth to the Control Tower later.</li>
 </ul>
 <h3 id="4-confirm-the-data-exhaust">4. Confirm the data exhaust<a class="anchor" href="#4-confirm-the-data-exhaust" aria-hidden="true">#</a></h3>
 <ul>
 <li>In Cosmos DB, find the <strong>conversations</strong> and <strong>interactions</strong> your traffic created. Note the
-database/container names and the partition key — Challenge 3 will mirror this into Fabric.</li>
+database/container names and partition keys: <code>/sessionId</code> for <code>conversations</code> and
+<code>/conversationId</code> for <code>interactions</code>. Challenge 3 will mirror this into Fabric.</li>
 </ul>
 <h2 id="success-criteria">Success criteria<a class="anchor" href="#success-criteria" aria-hidden="true">#</a></h2>
 <ul>
 <li><input disabled="" type="checkbox"> The agent workload is deployed and the frontend responds to prompts end-to-end</li>
-<li><input disabled="" type="checkbox"> You can show one <strong>end-to-end trace</strong> spanning backend → agent → model in App Insights</li>
-<li><input disabled="" type="checkbox"> The <strong>Application Map</strong> shows the services plus Cosmos DB and Azure OpenAI as dependencies</li>
-<li><input disabled="" type="checkbox"> You can point to a <strong>custom token/cost metric</strong> emitted by the agent</li>
+<li><input disabled="" type="checkbox"> You can show one correlated trace spanning backend → agent → model in App Insights</li>
+<li><input disabled="" type="checkbox"> The <strong>Application Map</strong> shows the backend and agent plus Cosmos DB and Azure OpenAI dependencies</li>
+<li><input disabled="" type="checkbox"> You can point to the custom token and latency metrics emitted by the agent</li>
 <li><input disabled="" type="checkbox"> Conversation/interaction documents are visible in <strong>Cosmos DB</strong></li>
-<li><input disabled="" type="checkbox"> You&#39;ve recorded the App Insights + Cosmos DB resource names for later challenges</li>
+<li><input disabled="" type="checkbox"> You&#39;ve recorded the App Insights, Log Analytics, and Cosmos DB resource coordinates for later challenges</li>
 </ul>
 <blockquote>
 <p>🧭 <strong>Checkpoint:</strong> walk your coach through a single user message and trace its journey across the
@@ -152,7 +157,7 @@ azd up      # pick your env name, region, and subscription when prompted</code><
 <p>The reference deployment uses <code>gpt-5-mini</code>. After deployment, <code>azd</code> prints the service URLs.</p>
 <p><code>azd up</code> is the normal path when Docker can download packages from npm and PyPI. On a restricted
 network, ask your coach for the remote-build path: provision with <code>azd provision</code>, build each image
-with <code>az acr build</code>, and attach the resulting images with <code>az containerapp update</code>.</p>
+as <code>latest</code> with <code>az acr build</code>, and attach it with a new Container Apps revision.</p>
 </details>
 
 <details>
@@ -171,29 +176,28 @@ done</code></pre>
 <summary>Finding telemetry in Application Insights</summary>
 
 <ul>
-<li><strong>Transaction search</strong> → pick a recent <code>POST /api/...</code> → open <strong>end-to-end transaction details</strong>
-to see the waterfall across services, Cosmos DB, and Azure OpenAI.</li>
+<li><strong>Transaction search</strong> → pick a recent backend <code>POST /api/...</code> → open <strong>end-to-end transaction
+details</strong> to see the backend, agent, Azure OpenAI, and Cosmos DB operations.</li>
 <li><strong>Application map</strong> → hover the edges for latency/volume.</li>
-<li><strong>Metrics</strong> → choose the custom metric namespace and plot <code>agent.tokens.completion</code> (or similar).</li>
-<li><strong>Logs (KQL)</strong> to confirm token flow:<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-kql">customMetrics
-| where name startswith &quot;agent.&quot;
-| summarize sum(value) by name, bin(timestamp, 5m)</code></pre>
+<li><strong>Logs (KQL)</strong> → run these checks and confirm each returns recent rows:<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-kql">AppRequests
+| where TimeGenerated &gt; ago(30m)
+| project TimeGenerated, AppRoleName, Name, OperationId, ResultCode, Success
+| order by TimeGenerated desc</code></pre>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-kql">AppDependencies
+| where TimeGenerated &gt; ago(30m)
+| project TimeGenerated, AppRoleName, Name, Target, OperationId, ResultCode, Success
+| order by TimeGenerated desc</code></pre>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-kql">AppMetrics
+| where TimeGenerated &gt; ago(30m) and Name startswith &quot;agent.&quot;
+| summarize Value=sum(Sum) by Name, bin(TimeGenerated, 5m)
+| order by TimeGenerated desc</code></pre>
 </li>
 </ul>
-</details>
-
-<details>
-<summary>Where's the telemetry contract?</summary>
-
-<p>The shared <a href="../resources/observability-sdk/README.html"><code>resources/observability-sdk/</code></a> defines the event and
-metric schema (AgentStart/Step/ExternalCall/End/Error, token &amp; cost metrics). Skim its README to
-understand what the agent <em>should</em> be emitting and why it matters for cost attribution later.</p>
 </details>
 
 <h2 id="resources">Resources<a class="anchor" href="#resources" aria-hidden="true">#</a></h2>
 <ul>
 <li><a href="../resources/agent-workload/README.html"><code>resources/agent-workload/README.md</code></a> — services, APIs, env vars, monitoring</li>
-<li><a href="../resources/observability-sdk/README.html"><code>resources/observability-sdk/README.md</code></a> — the telemetry contract</li>
 <li><a href="https://learn.microsoft.com/azure/azure-monitor/app/opentelemetry-enable" target="_blank" rel="noopener">Azure Monitor OpenTelemetry</a></li>
 </ul>
 <hr>
