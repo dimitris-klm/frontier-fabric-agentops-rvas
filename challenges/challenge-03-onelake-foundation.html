@@ -48,7 +48,7 @@
           <li><a class="h2" href="#prerequisites">Prerequisites</a></li>
           <li><a class="h2" href="#the-foundation">The foundation</a></li>
           <li><a class="h2" href="#your-mission">Your mission</a></li>
-          <li><a class="h3" href="#1-give-fabric-permission-to-see-the-landing-zone">1. Give Fabric permission to see the landing zone</a></li>
+          <li><a class="h3" href="#1-create-the-adls-gen2-cloud-connection">1. Create the ADLS Gen2 cloud connection</a></li>
           <li><a class="h3" href="#2-create-the-lakehouse-and-onelake-shortcuts">2. Create the Lakehouse and OneLake shortcuts</a></li>
           <li><a class="h3" href="#3-mirror-the-agent-conversation-database">3. Mirror the agent conversation database</a></li>
           <li><a class="h3" href="#4-prove-both-paths-work">4. Prove both paths work</a></li>
@@ -85,8 +85,8 @@ that brings Challenge 1 agent conversations into OneLake Delta tables for near-r
 <ul>
 <li>A team <strong>Fabric workspace</strong> assigned to your Fabric capacity.</li>
 <li>An <strong>Observability</strong> Lakehouse in that workspace.</li>
-<li>Four working <strong>OneLake shortcuts</strong> to the ADLS Gen2 landing-zone containers from Challenge 2:
-<code>costs</code>, <code>metrics</code>, <code>logs</code>, and <code>metadata</code>.</li>
+<li>Seven working <strong>OneLake shortcuts</strong> to the ADLS Gen2 landing-zone containers from Challenge 2:
+<code>costs</code>, <code>metadata</code>, three application telemetry sources, and two platform diagnostic sources.</li>
 <li>Cosmos DB <strong>Mirroring</strong> configured for the agent conversation data from Challenge 1.</li>
 <li>Proof that Fabric can query both a shortcut-backed file and a mirrored Cosmos table.</li>
 <li>A crisp explanation of <strong>zero-copy shortcuts</strong> vs <strong>Mirroring replication</strong>.</li>
@@ -94,10 +94,12 @@ that brings Challenge 1 agent conversations into OneLake Delta tables for near-r
 <h2 id="prerequisites">Prerequisites<a class="anchor" href="#prerequisites" aria-hidden="true">#</a></h2>
 <ul>
 <li>✅ Challenge 1 complete — the agent workload has written conversation data to Cosmos DB.</li>
-<li>✅ Challenge 2 complete — the ADLS Gen2 landing zone contains files in <code>costs</code>, <code>metrics</code>, <code>logs</code>,
-and <code>metadata</code>.</li>
+<li>✅ Challenge 2 complete — the ADLS Gen2 landing zone contains files in <code>costs</code>, <code>metadata</code>,
+<code>am-apprequests</code>, <code>am-appdependencies</code>, <code>am-appmetrics</code>, <code>insights-logs-audit</code>, and
+<code>insights-metrics-pt1m</code>.</li>
 <li>Fabric capacity ID from Challenge 0.</li>
 <li>ADLS Gen2 <strong>DFS endpoint</strong> from Challenge 2, like <code>https://&lt;account&gt;.dfs.core.windows.net</code>.</li>
+<li>Fabric cloud connection ID for that ADLS Gen2 endpoint, created in Step 1.</li>
 <li>Cosmos DB account name and database name from Challenge 1.</li>
 <li>Fabric tenant settings allow service principal / managed identity access and <strong>Mirroring</strong>.</li>
 <li>The reference setup assets in
@@ -106,7 +108,7 @@ and <code>metadata</code>.</li>
 <h2 id="the-foundation">The foundation<a class="anchor" href="#the-foundation" aria-hidden="true">#</a></h2>
 <p>Your architecture now gets its Fabric entry point:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-text">Challenge 2 ADLS Gen2 landing zone       Challenge 1 Cosmos DB
-costs · metrics · logs · metadata        conversations · messages/feedback
+costs · metadata · am-* · insights-*     conversations · interactions
           │                                         │
           │ OneLake shortcuts (zero copy)           │ Fabric Mirroring
           ▼                                         ▼
@@ -115,22 +117,67 @@ costs · metrics · logs · metadata        conversations · messages/feedback
 <p>Shortcuts keep the source files where they are. Mirroring continuously lands operational records into
 OneLake-managed Delta tables. Challenge 4 will use both as Bronze inputs.</p>
 <h2 id="your-mission">Your mission<a class="anchor" href="#your-mission" aria-hidden="true">#</a></h2>
-<h3 id="1-give-fabric-permission-to-see-the-landing-zone">1. Give Fabric permission to see the landing zone<a class="anchor" href="#1-give-fabric-permission-to-see-the-landing-zone" aria-hidden="true">#</a></h3>
+<h3 id="1-create-the-adls-gen2-cloud-connection">1. Create the ADLS Gen2 cloud connection<a class="anchor" href="#1-create-the-adls-gen2-cloud-connection" aria-hidden="true">#</a></h3>
 <ul>
-<li>Identify the workspace identity / managed identity your Fabric workspace will use for shortcuts.</li>
-<li>Grant it <strong>Storage Blob Data Reader</strong> on the ADLS Gen2 storage account from Challenge 2.</li>
-<li>Confirm the storage account DFS endpoint and the four expected containers are available:
-<code>costs</code>, <code>metrics</code>, <code>logs</code>, and <code>metadata</code>.</li>
+<li>Grant your organizational account <strong>Storage Blob Data Reader</strong> on the ADLS Gen2 storage account from
+Challenge 2.</li>
+<li>Confirm the storage account DFS endpoint and the seven required containers are available:
+<code>costs</code>, <code>metadata</code>, <code>am-apprequests</code>, <code>am-appdependencies</code>, <code>am-appmetrics</code>,
+<code>insights-logs-audit</code>, and <code>insights-metrics-pt1m</code>.</li>
+<li>In Fabric, open <strong>Settings</strong> &gt; <strong>Manage connections and gateways</strong>, select <strong>New</strong>, and create a
+<strong>Cloud</strong> connection of type <strong>Azure Data Lake Storage Gen2</strong>.</li>
+<li>Use the storage account DFS endpoint as the server, select <strong>Organizational account</strong> authentication,
+and set the privacy level to <strong>Organizational</strong>. If prompted for a path, use the storage account root
+so the connection can reach all seven containers.</li>
+<li>Open the new connection&#39;s settings and copy its <strong>Connection ID</strong>. You will pass this GUID to the
+setup script.</li>
 </ul>
-<p>This is the most common failure point. If Fabric cannot read the storage account, shortcuts may create
-but browsing/querying them will fail.</p>
+<p>This is a one-time setup. One cloud connection can authenticate all seven shortcuts because they use the
+same storage account.</p>
 <h3 id="2-create-the-lakehouse-and-onelake-shortcuts">2. Create the Lakehouse and OneLake shortcuts<a class="anchor" href="#2-create-the-lakehouse-and-onelake-shortcuts" aria-hidden="true">#</a></h3>
 <ul>
-<li>Create or reuse your team Fabric workspace on the Fabric capacity.</li>
-<li>Create a Lakehouse for the Control Tower foundation.</li>
-<li>Add OneLake shortcuts under the Lakehouse <code>Files/</code> area that point to the four ADLS Gen2 containers.</li>
-<li>Browse each shortcut and confirm you are seeing the <strong>same files</strong> that landed in Challenge 2 — not
-a copied export.</li>
+<li><p>Create or reuse your team Fabric workspace on the Fabric capacity.</p>
+</li>
+<li><p>Create a Lakehouse for the Control Tower foundation.</p>
+</li>
+<li><p>Add the seven OneLake shortcuts under the Lakehouse <code>Files/</code> area using this contract:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Lakehouse shortcut</th>
+<th>ADLS Gen2 container</th>
+</tr>
+</thead><tbody><tr>
+<td><code>Files/costs</code></td>
+<td><code>costs</code></td>
+</tr>
+<tr>
+<td><code>Files/metadata</code></td>
+<td><code>metadata</code></td>
+</tr>
+<tr>
+<td><code>Files/telemetry/apprequests</code></td>
+<td><code>am-apprequests</code></td>
+</tr>
+<tr>
+<td><code>Files/telemetry/appdependencies</code></td>
+<td><code>am-appdependencies</code></td>
+</tr>
+<tr>
+<td><code>Files/telemetry/appmetrics</code></td>
+<td><code>am-appmetrics</code></td>
+</tr>
+<tr>
+<td><code>Files/diagnostics/audit</code></td>
+<td><code>insights-logs-audit</code></td>
+</tr>
+<tr>
+<td><code>Files/diagnostics/platformmetrics</code></td>
+<td><code>insights-metrics-pt1m</code></td>
+</tr>
+</tbody></table></div>
+</li>
+<li><p>Browse each shortcut and confirm you are seeing the <strong>same files</strong> that landed in Challenge 2 — not
+a copied export.</p>
+</li>
 </ul>
 <p>The provided setup script can automate the workspace, Lakehouse, shortcuts, notebook imports, and
 pipeline imports:</p>
@@ -140,6 +187,7 @@ pip install -r src/setup/requirements.txt
 python src/setup/setup_fabric_workspace.py \
   --workspace-name &quot;Observability-Analytics&quot; \
   --storage-account-url &quot;https://&lt;account&gt;.dfs.core.windows.net&quot; \
+  --connection-id &quot;&lt;fabric-cloud-connection-id&gt;&quot; \
   --capacity-id &quot;&lt;fabric-capacity-id&gt;&quot;</code></pre>
 <h3 id="3-mirror-the-agent-conversation-database">3. Mirror the agent conversation database<a class="anchor" href="#3-mirror-the-agent-conversation-database" aria-hidden="true">#</a></h3>
 <ul>
@@ -160,8 +208,8 @@ python src/setup/setup_cosmos_mirroring.py \
 <h3 id="4-prove-both-paths-work">4. Prove both paths work<a class="anchor" href="#4-prove-both-paths-work" aria-hidden="true">#</a></h3>
 <p>Show your team and coach that Fabric can read from both enterprise connection patterns:</p>
 <ul>
-<li><strong>Shortcut path:</strong> browse <code>Files/costs</code>, <code>Files/metrics</code>, <code>Files/logs</code>, and <code>Files/metadata</code> in the
-Lakehouse and open or query one file.</li>
+<li><strong>Shortcut path:</strong> browse all seven paths in the shortcut contract and open or query at least one
+Parquet file and one JSON file.</li>
 <li><strong>Mirroring path:</strong> open the mirrored database, confirm the expected tables are present, and verify
 the sync status shows recent activity.</li>
 <li><strong>Latency target:</strong> after adding one new agent conversation, look for it in the mirrored table within
@@ -173,7 +221,7 @@ mirrored table.</li>
 <ul>
 <li><input disabled="" type="checkbox"> Fabric workspace is assigned to the correct capacity and the team can open it.</li>
 <li><input disabled="" type="checkbox"> Lakehouse exists for the Control Tower foundation.</li>
-<li><input disabled="" type="checkbox"> Four shortcuts exist and browse successfully: <code>costs</code>, <code>metrics</code>, <code>logs</code>, <code>metadata</code>.</li>
+<li><input disabled="" type="checkbox"> All seven shortcuts in the documented contract exist and browse successfully.</li>
 <li><input disabled="" type="checkbox"> Browsed shortcut files match the ADLS Gen2 files from Challenge 2 — no duplicate copy was made.</li>
 <li><input disabled="" type="checkbox"> Cosmos DB mirrored database exists with the expected conversation tables.</li>
 <li><input disabled="" type="checkbox"> Mirroring is running/healthy and recent records are syncing.</li>
@@ -196,9 +244,9 @@ extra egress. If the source file changes, Fabric reads the source location.</p>
 <details>
 <summary>Granting storage access</summary>
 
-<p>Use the storage account from Challenge 2 and grant the Fabric workspace identity / managed identity a
-data-plane role such as <strong>Storage Blob Data Reader</strong> at the storage-account scope. RBAC can take a few
-minutes to propagate before shortcut browsing works.</p>
+<p>Use the storage account from Challenge 2 and grant the organizational account used by the Fabric cloud
+connection a data-plane role such as <strong>Storage Blob Data Reader</strong> at the storage-account scope. RBAC can
+take a few minutes to propagate before shortcut browsing works.</p>
 </details>
 
 <details>
@@ -209,12 +257,12 @@ uses the Fabric REST API to:</p>
 <ol>
 <li>Create or reuse the workspace.</li>
 <li>Create the <code>Observability</code> Lakehouse.</li>
-<li>Create shortcuts for <code>costs</code>, <code>metrics</code>, <code>logs</code>, and <code>metadata</code> under <code>Files/</code>.</li>
+<li>Create seven shortcuts under <code>Files/</code> for cost, metadata, application telemetry, and platform
+  diagnostics using the documented path contract.</li>
 <li>Import notebooks from <code>resources/fabric-control-tower/fabric/notebooks/</code>.</li>
 <li>Import pipelines from <code>resources/fabric-control-tower/fabric/pipelines/</code>.</li>
 </ol>
-<p>If the Fabric API returns an async accepted response, wait for the item to finish provisioning and
-rerun the script if needed.</p>
+<p>The script waits for asynchronous Fabric item creation to finish before it creates dependent resources.</p>
 </details>
 
 <details>

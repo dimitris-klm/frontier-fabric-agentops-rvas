@@ -26,7 +26,15 @@ from rich.table import Table
 FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
 FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
 
-SHORTCUT_CONTAINERS = ["costs", "metrics", "logs", "metadata"]
+SHORTCUTS = [
+    {"path": "Files", "name": "costs", "subpath": "/costs"},
+    {"path": "Files", "name": "metadata", "subpath": "/metadata"},
+    {"path": "Files/telemetry", "name": "apprequests", "subpath": "/am-apprequests"},
+    {"path": "Files/telemetry", "name": "appdependencies", "subpath": "/am-appdependencies"},
+    {"path": "Files/telemetry", "name": "appmetrics", "subpath": "/am-appmetrics"},
+    {"path": "Files/diagnostics", "name": "audit", "subpath": "/insights-logs-audit"},
+    {"path": "Files/diagnostics", "name": "platformmetrics", "subpath": "/insights-metrics-pt1m"},
+]
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 NOTEBOOKS_DIR = REPO_ROOT / "fabric" / "notebooks"
@@ -139,6 +147,7 @@ class FabricClient:
         item_type: str,
         definition: dict[str, Any] | None = None,
         description: str | None = None,
+        creation_payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Create a workspace item if it does not already exist, otherwise return existing."""
         existing = self._find_item(workspace_id, display_name, item_type)
@@ -154,6 +163,8 @@ class FabricClient:
             payload["description"] = description
         if definition:
             payload["definition"] = definition
+        if creation_payload:
+            payload["creationPayload"] = creation_payload
 
         resp = self._post(f"/workspaces/{workspace_id}/items", payload)
         if resp.status_code == 202:
@@ -194,8 +205,13 @@ class FabricClient:
     # ------------------------------------------------------------------
 
     def create_or_get_lakehouse(self, workspace_id: str, display_name: str = "Observability") -> dict[str, Any]:
-        """Create a Lakehouse item in the workspace."""
-        return self.create_or_get_item(workspace_id, display_name, "Lakehouse")
+        """Create a schema-enabled Lakehouse item in the workspace."""
+        return self.create_or_get_item(
+            workspace_id,
+            display_name,
+            "Lakehouse",
+            creation_payload={"enableSchemas": True},
+        )
 
     # ------------------------------------------------------------------
     # Shortcuts
@@ -205,11 +221,11 @@ class FabricClient:
         self,
         workspace_id: str,
         lakehouse_id: str,
+        shortcut_path: str,
         shortcut_name: str,
         storage_account_url: str,
         connection_id: str,
-        container_name: str,
-        sub_path: str = "/",
+        subpath: str,
     ) -> None:
         """Create an ADLS Gen2 shortcut in the Lakehouse Files section."""
         path = f"/workspaces/{workspace_id}/items/{lakehouse_id}/shortcuts"
@@ -219,7 +235,7 @@ class FabricClient:
             resp = self._get(path)
             existing = resp.json().get("value", [])
             for sc in existing:
-                if sc.get("name") == shortcut_name:
+                if sc.get("path") == shortcut_path and sc.get("name") == shortcut_name:
                     console.print(f"  [yellow]⏭  Shortcut '{shortcut_name}' already exists — skipping.[/yellow]")
                     return
         except requests.HTTPError:
@@ -227,12 +243,12 @@ class FabricClient:
             pass
 
         payload = {
-            "path": "Files",
+            "path": shortcut_path,
             "name": shortcut_name,
             "target": {
                 "adlsGen2": {
                     "location": storage_account_url,
-                    "subpath": sub_path,
+                    "subpath": subpath,
                     "connectionId": connection_id,
                 },
             },
@@ -240,7 +256,7 @@ class FabricClient:
 
         try:
             self._post(path, payload)
-            console.print(f"  [green]✔  Created shortcut '{shortcut_name}' → {container_name}.[/green]")
+            console.print(f"  [green]✔  Created shortcut '{shortcut_path}/{shortcut_name}' → {subpath}.[/green]")
         except requests.HTTPError as exc:
             console.print(f"  [red]✖  Failed to create shortcut '{shortcut_name}': {exc}[/red]")
             raise
@@ -249,8 +265,14 @@ class FabricClient:
     # Notebooks
     # ------------------------------------------------------------------
 
-    def import_notebooks(self, workspace_id: str, notebooks_dir: pathlib.Path) -> list[dict[str, Any]]:
-        """Import all .ipynb notebooks from a directory."""
+    def import_notebooks(
+        self,
+        workspace_id: str,
+        lakehouse_id: str,
+        lakehouse_name: str,
+        notebooks_dir: pathlib.Path,
+    ) -> list[dict[str, Any]]:
+        """Import all .ipynb notebooks with a default Lakehouse binding."""
         results: list[dict[str, Any]] = []
         if not notebooks_dir.is_dir():
             console.print(f"[yellow]⚠  Notebooks directory not found: {notebooks_dir}[/yellow]")
@@ -263,7 +285,21 @@ class FabricClient:
 
         for nb_path in notebook_files:
             display_name = nb_path.stem
-            raw_content = nb_path.read_bytes()
+            notebook_content = json.loads(nb_path.read_text(encoding="utf-8"))
+            lakehouse_dependency = (
+                notebook_content
+                .setdefault("metadata", {})
+                .setdefault("dependencies", {})
+                .setdefault("lakehouse", {})
+            )
+            lakehouse_dependency.update(
+                {
+                    "default_lakehouse": lakehouse_id,
+                    "default_lakehouse_workspace_id": workspace_id,
+                    "default_lakehouse_name": lakehouse_name,
+                }
+            )
+            raw_content = (json.dumps(notebook_content, ensure_ascii=False) + "\n").encode("utf-8")
             encoded = base64.b64encode(raw_content).decode("utf-8")
 
             definition = {
@@ -449,26 +485,32 @@ def main(workspace_name: str, storage_account_url: str, connection_id: str, capa
         with console.status("Creating Lakehouse…"):
             lakehouse = client.create_or_get_lakehouse(workspace_id)
         lakehouse_id = lakehouse.get("id", "")
+        lakehouse_name = lakehouse.get("displayName", "Observability")
+
+        if not lakehouse_id:
+            raise RuntimeError("Fabric did not return a Lakehouse ID; notebooks cannot be bound.")
 
         # 3. ADLS Gen2 shortcuts -----------------------------------------
-        if lakehouse_id:
-            with console.status("Creating ADLS Gen2 shortcuts…"):
-                for container in SHORTCUT_CONTAINERS:
-                    client.create_shortcut(
-                        workspace_id=workspace_id,
-                        lakehouse_id=lakehouse_id,
-                        shortcut_name=container,
-                        storage_account_url=storage_account_url,
-                        connection_id=connection_id,
-                        container_name=container,
-                        sub_path=f"/{container}",
-                    )
-        else:
-            console.print("[yellow]⚠  Lakehouse ID unavailable — skipping shortcuts.[/yellow]")
+        with console.status("Creating ADLS Gen2 shortcuts…"):
+            for shortcut in SHORTCUTS:
+                client.create_shortcut(
+                    workspace_id=workspace_id,
+                    lakehouse_id=lakehouse_id,
+                    shortcut_path=shortcut["path"],
+                    shortcut_name=shortcut["name"],
+                    storage_account_url=storage_account_url,
+                    connection_id=connection_id,
+                    subpath=shortcut["subpath"],
+                )
 
         # 4. Notebooks ---------------------------------------------------
         with console.status("Importing notebooks…"):
-            notebooks = client.import_notebooks(workspace_id, NOTEBOOKS_DIR)
+            notebooks = client.import_notebooks(
+                workspace_id=workspace_id,
+                lakehouse_id=lakehouse_id,
+                lakehouse_name=lakehouse_name,
+                notebooks_dir=NOTEBOOKS_DIR,
+            )
 
         # 5. Pipelines ---------------------------------------------------
         with console.status("Importing pipelines…"):

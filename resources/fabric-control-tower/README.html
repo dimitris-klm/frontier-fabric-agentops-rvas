@@ -105,10 +105,10 @@ tower</strong> itself — the Fabric workspace you stand up across
 │  ┌─────────────────────────────────────┐   ┌────────────────────────────┐  │
 │  │  Lakehouse (OneLake)                │   │  Mirrored Database         │  │
 │  │  ├─ Files/                          │   │  Cosmos DB → Delta Tables  │  │
-│  │  │   ├─ costs/        (shortcut)    │   │  (near-real-time sync)     │  │
-│  │  │   ├─ metrics/      (shortcut)    │   └────────────┬───────────────┘  │
-│  │  │   ├─ logs/         (shortcut)    │                │                  │
-│  │  │   └─ resource-metadata/ (shortcut│                │                  │
+│  │  │   ├─ costs/          (shortcut)  │   │  (near-real-time sync)     │  │
+│  │  │   ├─ metadata/       (shortcut)  │   └────────────┬───────────────┘  │
+│  │  │   ├─ telemetry/      (shortcuts) │                │                  │
+│  │  │   └─ diagnostics/    (shortcuts) │                │                  │
 │  │  └─ Tables/                         │                │                  │
 │  │      ├─ bronze_*  (raw Delta)       │◄───────────────┘                  │
 │  │      ├─ silver_*  (cleansed Delta)  │                                   │
@@ -180,18 +180,22 @@ azd provision</code></pre>
 <li><strong>User-Assigned Managed Identity</strong> — grants Fabric access to ADLS Gen2</li>
 </ul>
 <h3 id="2-configure-fabric-workspace">2. Configure Fabric Workspace<a class="anchor" href="#2-configure-fabric-workspace" aria-hidden="true">#</a></h3>
-<p>Create the Fabric workspace, lakehouse, ADLS shortcuts, and import notebooks:</p>
+<p>In Fabric, create one <strong>Azure Data Lake Storage Gen2</strong> cloud connection for the storage account DFS
+endpoint using <strong>Organizational account</strong> authentication. Copy the connection ID from the connection&#39;s
+settings, then create the Fabric workspace, lakehouse, ADLS shortcuts, and import notebooks:</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">pip install -r src/setup/requirements.txt
 
 python src/setup/setup_fabric_workspace.py \
   --workspace-name &quot;Observability-Analytics&quot; \
   --storage-account-url &quot;https://&lt;account&gt;.dfs.core.windows.net&quot; \
+  --connection-id &quot;&lt;fabric-cloud-connection-id&gt;&quot; \
   --capacity-id &quot;&lt;fabric-capacity-id&gt;&quot;</code></pre>
 <p>The script performs the following:</p>
 <ol>
 <li>Creates (or reuses) a Fabric workspace assigned to the specified capacity.</li>
 <li>Creates an <strong>Observability</strong> lakehouse inside the workspace.</li>
-<li>Adds ADLS Gen2 shortcuts under <code>Files/</code> for each data container (<code>costs</code>, <code>metrics</code>, <code>logs</code>, <code>resource-metadata</code>).</li>
+<li>Adds ADLS Gen2 shortcuts under <code>Files/</code> for <code>costs</code>, <code>metadata</code>, the three required <code>am-*</code>
+  application telemetry containers, and the two required <code>insights-*</code> diagnostic containers.</li>
 <li>Uploads and imports all PySpark notebooks from <code>fabric/notebooks/</code>.</li>
 <li>Creates the <strong>Load E2E Pipeline</strong> and <strong>Daily Refresh Pipeline</strong>.</li>
 </ol>
@@ -239,7 +243,9 @@ python src/setup/setup_fabric_workspace.py \
 <h2 id="notebooks">Notebooks<a class="anchor" href="#notebooks" aria-hidden="true">#</a></h2>
 <h3 id="01bronzeingestionipynb">01_bronze_ingestion.ipynb<a class="anchor" href="#01bronzeingestionipynb" aria-hidden="true">#</a></h3>
 <p>Reads raw Parquet files from ADLS Gen2 shortcuts and writes Delta tables into the Lakehouse <code>Tables/</code> section.</p>
-<p><strong>Input</strong>: <code>Files/costs/</code>, <code>Files/metrics/</code>, <code>Files/logs/</code>, <code>Files/resource-metadata/</code>
+<p><strong>Input</strong>: <code>Files/costs/</code>, <code>Files/metadata/</code>, <code>Files/telemetry/apprequests/</code>,
+<code>Files/telemetry/appdependencies/</code>, <code>Files/telemetry/appmetrics/</code>, <code>Files/diagnostics/audit/</code>,
+<code>Files/diagnostics/platformmetrics/</code>
 <strong>Output</strong>: <code>bronze_costs</code>, <code>bronze_metrics</code>, <code>bronze_logs</code>, <code>bronze_resource_metadata</code></p>
 <p>Key behaviors:</p>
 <ul>

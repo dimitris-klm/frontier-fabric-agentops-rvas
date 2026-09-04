@@ -23,8 +23,8 @@ By the end of this challenge you will have:
 
 - A team **Fabric workspace** assigned to your Fabric capacity.
 - An **Observability** Lakehouse in that workspace.
-- Four working **OneLake shortcuts** to the ADLS Gen2 landing-zone containers from Challenge 2:
-  `costs`, `metrics`, `logs`, and `metadata`.
+- Seven working **OneLake shortcuts** to the ADLS Gen2 landing-zone containers from Challenge 2:
+  `costs`, `metadata`, three application telemetry sources, and two platform diagnostic sources.
 - Cosmos DB **Mirroring** configured for the agent conversation data from Challenge 1.
 - Proof that Fabric can query both a shortcut-backed file and a mirrored Cosmos table.
 - A crisp explanation of **zero-copy shortcuts** vs **Mirroring replication**.
@@ -32,8 +32,9 @@ By the end of this challenge you will have:
 ## Prerequisites
 
 - ✅ Challenge 1 complete — the agent workload has written conversation data to Cosmos DB.
-- ✅ Challenge 2 complete — the ADLS Gen2 landing zone contains files in `costs`, `metrics`, `logs`,
-  and `metadata`.
+- ✅ Challenge 2 complete — the ADLS Gen2 landing zone contains files in `costs`, `metadata`,
+  `am-apprequests`, `am-appdependencies`, `am-appmetrics`, `insights-logs-audit`, and
+  `insights-metrics-pt1m`.
 - Fabric capacity ID from Challenge 0.
 - ADLS Gen2 **DFS endpoint** from Challenge 2, like `https://<account>.dfs.core.windows.net`.
 - Fabric cloud connection ID for that ADLS Gen2 endpoint, created in Step 1.
@@ -48,7 +49,7 @@ Your architecture now gets its Fabric entry point:
 
 ```text
 Challenge 2 ADLS Gen2 landing zone       Challenge 1 Cosmos DB
-costs · metrics · logs · metadata        conversations · messages/feedback
+costs · metadata · am-* · insights-*     conversations · interactions
           │                                         │
           │ OneLake shortcuts (zero copy)           │ Fabric Mirroring
           ▼                                         ▼
@@ -65,24 +66,36 @@ OneLake-managed Delta tables. Challenge 4 will use both as Bronze inputs.
 
 - Grant your organizational account **Storage Blob Data Reader** on the ADLS Gen2 storage account from
   Challenge 2.
-- Confirm the storage account DFS endpoint and the four expected containers are available:
-  `costs`, `metrics`, `logs`, and `metadata`.
+- Confirm the storage account DFS endpoint and the seven required containers are available:
+  `costs`, `metadata`, `am-apprequests`, `am-appdependencies`, `am-appmetrics`,
+  `insights-logs-audit`, and `insights-metrics-pt1m`.
 - In Fabric, open **Settings** > **Manage connections and gateways**, select **New**, and create a
   **Cloud** connection of type **Azure Data Lake Storage Gen2**.
 - Use the storage account DFS endpoint as the server, select **Organizational account** authentication,
   and set the privacy level to **Organizational**. If prompted for a path, use the storage account root
-  so the connection can reach all four containers.
+  so the connection can reach all seven containers.
 - Open the new connection's settings and copy its **Connection ID**. You will pass this GUID to the
   setup script.
 
-This is a one-time setup. One cloud connection can authenticate all four shortcuts because they use the
+This is a one-time setup. One cloud connection can authenticate all seven shortcuts because they use the
 same storage account.
 
 ### 2. Create the Lakehouse and OneLake shortcuts
 
 - Create or reuse your team Fabric workspace on the Fabric capacity.
 - Create a Lakehouse for the Control Tower foundation.
-- Add OneLake shortcuts under the Lakehouse `Files/` area that point to the four ADLS Gen2 containers.
+- Add the seven OneLake shortcuts under the Lakehouse `Files/` area using this contract:
+
+  | Lakehouse shortcut | ADLS Gen2 container |
+  |---|---|
+  | `Files/costs` | `costs` |
+  | `Files/metadata` | `metadata` |
+  | `Files/telemetry/apprequests` | `am-apprequests` |
+  | `Files/telemetry/appdependencies` | `am-appdependencies` |
+  | `Files/telemetry/appmetrics` | `am-appmetrics` |
+  | `Files/diagnostics/audit` | `insights-logs-audit` |
+  | `Files/diagnostics/platformmetrics` | `insights-metrics-pt1m` |
+
 - Browse each shortcut and confirm you are seeing the **same files** that landed in Challenge 2 — not
   a copied export.
 
@@ -104,6 +117,8 @@ python src/setup/setup_fabric_workspace.py \
 
 - Enable the Cosmos DB prerequisites for Fabric Mirroring, including continuous backup / analytical
   store as required by your Cosmos DB configuration.
+- In Fabric, create an **Azure Cosmos DB v2** cloud connection for the Challenge 1 account using
+  **Organizational account** authentication. Copy its Connection ID from the connection settings.
 - Create a Fabric mirrored database item for the Cosmos DB database used by the agent workload.
 - Select the conversation containers from Challenge 1. The reference assets describe
   `conversations`, `messages`, and `feedback`; the included setup script currently configures
@@ -117,15 +132,37 @@ cd resources/fabric-control-tower
 python src/setup/setup_cosmos_mirroring.py \
   --workspace-id "<fabric-workspace-id>" \
   --cosmos-account "<cosmos-account-name>" \
-  --database "observability"
+  --database "observability" \
+  --connection-id "<fabric-cosmos-connection-id>"
 ```
 
-### 4. Prove both paths work
+### 4. Expose the mirrored tables in the Lakehouse
+
+A mirrored database is a separate Fabric item, so Spark notebooks cannot read its Delta tables by
+path. Add one **OneLake table shortcut** per mirrored container into the Lakehouse `Tables/dbo` area
+so the Challenge 4 notebooks can read them:
+
+| Lakehouse shortcut | Mirrored database source |
+|---|---|
+| `Tables/dbo/conversations` | `CosmosDB-agentsdb` → `Tables/agentsdb/conversations` |
+| `Tables/dbo/interactions` | `CosmosDB-agentsdb` → `Tables/agentsdb/interactions` |
+
+In the Fabric UI:
+
+1. Open the Lakehouse, hover **Tables**, then choose **New shortcut → Microsoft OneLake**.
+2. Pick the `CosmosDB-agentsdb` mirrored database as the data source.
+3. Expand `Tables` → `agentsdb` and select both `conversations` and `interactions`.
+4. Create the shortcuts and confirm they appear under `Tables/dbo` with the same names.
+
+This step is **not** automated by the setup scripts — create the two shortcuts yourself after
+Mirroring reports a running status, otherwise the source tables will not exist yet.
+
+### 5. Prove both paths work
 
 Show your team and coach that Fabric can read from both enterprise connection patterns:
 
-- **Shortcut path:** browse `Files/costs`, `Files/metrics`, `Files/logs`, and `Files/metadata` in the
-  Lakehouse and open or query one file.
+- **Shortcut path:** browse all seven paths in the shortcut contract and open or query at least one
+  Parquet file and one JSON file.
 - **Mirroring path:** open the mirrored database, confirm the expected tables are present, and verify
   the sync status shows recent activity.
 - **Latency target:** after adding one new agent conversation, look for it in the mirrored table within
@@ -137,10 +174,11 @@ Show your team and coach that Fabric can read from both enterprise connection pa
 
 - [ ] Fabric workspace is assigned to the correct capacity and the team can open it.
 - [ ] Lakehouse exists for the Control Tower foundation.
-- [ ] Four shortcuts exist and browse successfully: `costs`, `metrics`, `logs`, `metadata`.
+- [ ] All seven shortcuts in the documented contract exist and browse successfully.
 - [ ] Browsed shortcut files match the ADLS Gen2 files from Challenge 2 — no duplicate copy was made.
 - [ ] Cosmos DB mirrored database exists with the expected conversation tables.
 - [ ] Mirroring is running/healthy and recent records are syncing.
+- [ ] `Tables/dbo/conversations` and `Tables/dbo/interactions` OneLake shortcuts resolve in the Lakehouse.
 - [ ] Your team can query one shortcut file and one mirrored table.
 - [ ] Your team can explain **zero-copy shortcut** vs **Mirroring replication** to your coach.
 
@@ -173,7 +211,8 @@ uses the Fabric REST API to:
 
 1. Create or reuse the workspace.
 2. Create the `Observability` Lakehouse.
-3. Create shortcuts for `costs`, `metrics`, `logs`, and `metadata` under `Files/`.
+3. Create seven shortcuts under `Files/` for cost, metadata, application telemetry, and platform
+  diagnostics using the documented path contract.
 4. Import notebooks from `resources/fabric-control-tower/fabric/notebooks/`.
 5. Import pipelines from `resources/fabric-control-tower/fabric/pipelines/`.
 
