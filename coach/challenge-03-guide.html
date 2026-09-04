@@ -91,7 +91,7 @@ can become useful. Teams should leave understanding two distinct patterns:</p>
 <li><strong>Cosmos DB Mirroring</strong> continuously replicates operational data into OneLake Delta tables without a
 hand-built connector pipeline.</li>
 </ul>
-<p><strong>What good looks like:</strong> the team opens a Lakehouse, browses four shortcuts, opens a mirrored Cosmos
+<p><strong>What good looks like:</strong> the team opens a Lakehouse, browses seven shortcuts, opens a mirrored Cosmos
 database with recent rows, runs one query against each path, and explains why this feeds Bronze in
 Challenge 4.</p>
 <h2 id="the-reference-path">The reference path<a class="anchor" href="#the-reference-path" aria-hidden="true">#</a></h2>
@@ -101,30 +101,43 @@ Challenge 4.</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">cd resources/fabric-control-tower
 pip install -r src/setup/requirements.txt</code></pre>
 </li>
-<li><p><strong>Confirm storage RBAC</strong></p>
+<li><p><strong>Create the ADLS Gen2 cloud connection</strong></p>
 <ul>
-<li>The Fabric workspace identity / managed identity needs <strong>Storage Blob Data Reader</strong> on the ADLS
+<li>The organizational account used by the connection needs <strong>Storage Blob Data Reader</strong> on the ADLS
 Gen2 account created in Challenge 2.</li>
 <li>The setup script uses ADLS Gen2 shortcuts with the storage DFS endpoint, so the URL should look
 like <code>https://&lt;account&gt;.dfs.core.windows.net</code>.</li>
-<li>Containers expected by the script: <code>costs</code>, <code>metrics</code>, <code>logs</code>, <code>metadata</code>.</li>
+<li>Containers expected by the script: <code>costs</code>, <code>metadata</code>, <code>am-apprequests</code>,
+<code>am-appdependencies</code>, <code>am-appmetrics</code>, <code>insights-logs-audit</code>, and <code>insights-metrics-pt1m</code>.</li>
+<li>In Fabric, open <strong>Settings</strong> &gt; <strong>Manage connections and gateways</strong>, create a <strong>Cloud</strong> connection
+of type <strong>Azure Data Lake Storage Gen2</strong>, and use <strong>Organizational account</strong> authentication with
+the <strong>Organizational</strong> privacy level.</li>
+<li>Scope the connection to the storage account root if a path is requested, then copy the connection
+ ID from its settings. The same connection ID is used for all seven shortcuts.</li>
 </ul>
 </li>
 <li><p><strong>Create workspace, Lakehouse, shortcuts, notebooks, and pipelines</strong></p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python src/setup/setup_fabric_workspace.py \
   --workspace-name &quot;Observability-Analytics&quot; \
   --storage-account-url &quot;https://&lt;account&gt;.dfs.core.windows.net&quot; \
+  --connection-id &quot;&lt;fabric-cloud-connection-id&gt;&quot; \
   --capacity-id &quot;&lt;fabric-capacity-id&gt;&quot;</code></pre>
 <p>The script creates/reuses the Fabric workspace, creates the <code>Observability</code> Lakehouse, adds
 shortcuts under <code>Files/</code>, imports notebooks from <code>fabric/notebooks/</code>, and imports pipeline JSON from
 <code>fabric/pipelines/</code>. It prints the workspace and Lakehouse IDs; have the team capture them.</p>
 </li>
 <li><p><strong>Configure Cosmos DB Mirroring</strong></p>
+<ul>
+<li>In Fabric, create an <strong>Azure Cosmos DB v2</strong> cloud connection for the Challenge 1 account using
+<strong>Organizational account</strong> authentication, then copy its Connection ID.</li>
+</ul>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python src/setup/setup_cosmos_mirroring.py \
   --workspace-id &quot;&lt;workspace-id&gt;&quot; \
   --cosmos-account &quot;&lt;cosmos-account-name&gt;&quot; \
-  --database &quot;observability&quot;</code></pre>
-<p>Real flags are <code>--workspace-id</code>, <code>--cosmos-account</code>, and <code>--database</code>. The current script mirrors
+  --database &quot;observability&quot; \
+  --connection-id &quot;&lt;fabric-cosmos-connection-id&gt;&quot;</code></pre>
+<p>The connection ID is optional only when the script can resolve exactly one Cosmos connection by
+endpoint. The current script mirrors
 <code>conversations</code> and <code>interactions</code>; the README narrative references <code>conversations</code>, <code>messages</code>, and
 <code>feedback</code>. Coach teams to verify the actual containers created in Challenge 1 and adjust selection
 in Fabric UI or the script if their deployment differs.</p>
@@ -132,26 +145,33 @@ in Fabric UI or the script if their deployment differs.</p>
 <li><p><strong>Handle async Fabric API creation</strong></p>
 <ul>
 <li><code>setup_fabric_workspace.py</code> and <code>setup_cosmos_mirroring.py</code> both tolerate existing items.</li>
-<li>If item creation returns <code>202 Accepted</code>, wait for provisioning to finish and rerun the script.</li>
 </ul>
 </li>
 </ol>
+<ul>
+<li><code>setup_fabric_workspace.py</code> waits for asynchronous item creation before continuing.</li>
+</ul>
 <h2 id="checkpoint-verification">Checkpoint verification<a class="anchor" href="#checkpoint-verification" aria-hidden="true">#</a></h2>
 <p>Ask the team to show:</p>
 <ol>
 <li><strong>Workspace + Lakehouse</strong> — workspace assigned to the intended capacity; <code>Observability</code> Lakehouse
 exists.</li>
-<li><strong>Shortcuts</strong> — <code>Files/costs</code>, <code>Files/metrics</code>, <code>Files/logs</code>, <code>Files/metadata</code> browse successfully.</li>
+<li><strong>Shortcuts</strong> — <code>Files/costs</code>, <code>Files/metadata</code>, <code>Files/telemetry/apprequests</code>,
+<code>Files/telemetry/appdependencies</code>, <code>Files/telemetry/appmetrics</code>, <code>Files/diagnostics/audit</code>, and
+<code>Files/diagnostics/platformmetrics</code> browse successfully.</li>
 <li><strong>Zero-copy proof</strong> — a file visible through a shortcut matches the ADLS Gen2 landing-zone path from
 Challenge 2.</li>
 <li><strong>Mirroring</strong> — mirrored database item exists; selected tables are present; status is running or
 healthy.</li>
+<li><strong>Mirrored-table shortcuts</strong> — <code>Tables/dbo/conversations</code> and <code>Tables/dbo/interactions</code> OneLake
+shortcuts exist in the Lakehouse and point at <code>CosmosDB-agentsdb</code>. These are created manually in
+the Fabric UI; no setup script creates them.</li>
 <li><strong>Freshness</strong> — after a new agent conversation, the row appears in Fabric with target latency under
 roughly one minute.</li>
 <li><strong>Queries</strong> — one shortcut-backed file query and one mirrored-table query run successfully.</li>
 <li><strong>Explanation</strong> — team can state: shortcuts are pointers; Mirroring replicates to Delta.</li>
 </ol>
-<p>✅ Pass when all four shortcuts work, mirrored tables are syncing, and the team can explain both data
+<p>✅ Pass when all seven shortcuts work, mirrored tables are syncing, and the team can explain both data
 movement patterns without prompting.</p>
 <h2 id="common-pitfalls-fixes">Common pitfalls &amp; fixes<a class="anchor" href="#common-pitfalls-fixes" aria-hidden="true">#</a></h2>
 <div class="table-wrap"><table><thead><tr>
@@ -159,8 +179,12 @@ movement patterns without prompting.</p>
 <th>Fix</th>
 </tr>
 </thead><tbody><tr>
+<td>Shortcut creation fails because <code>connectionId</code> is missing or invalid</td>
+<td>Create the ADLS Gen2 cloud connection, copy its connection ID, and pass it with <code>--connection-id</code></td>
+</tr>
+<tr>
 <td>Shortcut creation or browsing returns <strong>403</strong></td>
-<td>Grant the workspace identity / managed identity <strong>Storage Blob Data Reader</strong> on the Challenge 2 storage account; wait for RBAC propagation</td>
+<td>Grant the organizational account used by the cloud connection <strong>Storage Blob Data Reader</strong> on the Challenge 2 storage account; wait for RBAC propagation</td>
 </tr>
 <tr>
 <td>Fabric <strong>Mirroring tenant setting</strong> disabled</td>
@@ -179,16 +203,20 @@ movement patterns without prompting.</p>
 <td>Keep Azure subscription, Cosmos DB, storage, and Fabric workspace in the same tenant for the RVAS path</td>
 </tr>
 <tr>
-<td>Fabric API returns <strong>202 Accepted</strong> and item ID is missing</td>
-<td>Creation is asynchronous; wait in Fabric until the item appears, then rerun the idempotent script</td>
+<td>Fabric asynchronous operation times out or fails</td>
+<td>Read the operation error printed by the script, correct the underlying Fabric issue, and rerun the idempotent script</td>
 </tr>
 <tr>
-<td><code>metadata</code> vs <code>resource-metadata</code> naming confusion</td>
-<td>The script creates shortcut <code>metadata</code>; the README&#39;s notebook section may call the domain <code>resource-metadata</code>. Verify the actual Challenge 2 container name and keep the path consistent before Challenge 4</td>
+<td>A shortcut target is empty or missing</td>
+<td>Compare its ADLS target with the Challenge 2 validation output. Log Analytics data export does not backfill, so generate fresh agent traffic if an <code>am-*</code> container has not appeared</td>
 </tr>
 <tr>
 <td>Mirrored table names differ from the guide</td>
 <td>Check Cosmos DB containers from Challenge 1. Current setup script uses <code>conversations</code> and <code>interactions</code>; select <code>messages</code>/<code>feedback</code> only if those containers exist</td>
+</tr>
+<tr>
+<td>Notebook 4 fails with a path/table-not-found error on <code>Tables/dbo/conversations</code></td>
+<td>The OneLake table shortcuts to the mirrored database were never created. Add them from the Lakehouse <strong>New shortcut → Microsoft OneLake</strong> flow after Mirroring reports running</td>
 </tr>
 </tbody></table></div>
 <h2 id="talking-points-mini-briefing">Talking points (mini-briefing)<a class="anchor" href="#talking-points-mini-briefing" aria-hidden="true">#</a></h2>

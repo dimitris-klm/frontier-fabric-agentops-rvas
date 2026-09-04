@@ -105,11 +105,11 @@ tower</strong> itself — the Fabric workspace you stand up across
 │  ┌─────────────────────────────────────┐   ┌────────────────────────────┐  │
 │  │  Lakehouse (OneLake)                │   │  Mirrored Database         │  │
 │  │  ├─ Files/                          │   │  Cosmos DB → Delta Tables  │  │
-│  │  │   ├─ costs/        (shortcut)    │   │  (near-real-time sync)     │  │
-│  │  │   ├─ metrics/      (shortcut)    │   └────────────┬───────────────┘  │
-│  │  │   ├─ logs/         (shortcut)    │                │                  │
-│  │  │   └─ resource-metadata/ (shortcut│                │                  │
-│  │  └─ Tables/                         │                │                  │
+│  │  │   ├─ costs/          (shortcut)  │   │  (near-real-time sync)     │  │
+│  │  │   ├─ metadata/       (shortcut)  │   └────────────┬───────────────┘  │
+│  │  │   ├─ telemetry/      (shortcuts) │                │                  │
+│  │  │   └─ diagnostics/    (shortcuts) │                │                  │
+│  │  └─ Tables/dbo/                     │                │                  │
 │  │      ├─ bronze_*  (raw Delta)       │◄───────────────┘                  │
 │  │      ├─ silver_*  (cleansed Delta)  │                                   │
 │  │      └─ gold_*    (aggregated Delta)│                                   │
@@ -191,7 +191,8 @@ python src/setup/setup_fabric_workspace.py \
 <ol>
 <li>Creates (or reuses) a Fabric workspace assigned to the specified capacity.</li>
 <li>Creates an <strong>Observability</strong> lakehouse inside the workspace.</li>
-<li>Adds ADLS Gen2 shortcuts under <code>Files/</code> for each data container (<code>costs</code>, <code>metrics</code>, <code>logs</code>, <code>resource-metadata</code>).</li>
+<li>Adds ADLS Gen2 shortcuts under <code>Files/</code> for <code>costs</code>, <code>metadata</code>, the three required <code>am-*</code>
+  application telemetry containers, and the two required <code>insights-*</code> diagnostic containers.</li>
 <li>Uploads and imports all PySpark notebooks from <code>fabric/notebooks/</code>.</li>
 <li>Creates the <strong>Load E2E Pipeline</strong> and <strong>Daily Refresh Pipeline</strong>.</li>
 </ol>
@@ -200,12 +201,14 @@ python src/setup/setup_fabric_workspace.py \
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python src/setup/setup_cosmos_mirroring.py \
   --workspace-id &quot;&lt;workspace-id&gt;&quot; \
   --cosmos-account &quot;&lt;cosmos-account-name&gt;&quot; \
-  --database &quot;observability&quot;</code></pre>
+  --database &quot;agentsdb&quot; \
+  --connection-id &quot;&lt;fabric-cosmos-connection-id&gt;&quot;</code></pre>
 <p>The script:</p>
 <ol>
-<li>Enables the Cosmos DB account for Fabric Mirroring (continuous backup, analytical store).</li>
-<li>Creates a mirrored database item in the Fabric workspace.</li>
-<li>Configures table selection and replication for the <code>conversations</code>, <code>messages</code>, and <code>feedback</code> containers.</li>
+<li>Resolves the participant-owned <strong>Azure Cosmos DB v2</strong> cloud connection by ID or account endpoint.</li>
+<li>Creates a mirrored database definition for the Cosmos DB database in the Fabric workspace.</li>
+<li>Starts replication and confirms that Mirroring reaches a running state. Verify that the
+<code>conversations</code> and <code>interactions</code> containers from Challenge 1 appear as mirrored tables.</li>
 </ol>
 <h3 id="4-run-notebooks">4. Run Notebooks<a class="anchor" href="#4-run-notebooks" aria-hidden="true">#</a></h3>
 <p>Run the notebooks in order — either manually in Fabric or via the E2E pipeline:</p>
@@ -238,8 +241,10 @@ python src/setup/setup_fabric_workspace.py \
 <p>To trigger all four in sequence, open the <strong>Load E2E Pipeline</strong> in Fabric and click <strong>Run</strong>.</p>
 <h2 id="notebooks">Notebooks<a class="anchor" href="#notebooks" aria-hidden="true">#</a></h2>
 <h3 id="01bronzeingestionipynb">01_bronze_ingestion.ipynb<a class="anchor" href="#01bronzeingestionipynb" aria-hidden="true">#</a></h3>
-<p>Reads raw Parquet files from ADLS Gen2 shortcuts and writes Delta tables into the Lakehouse <code>Tables/</code> section.</p>
-<p><strong>Input</strong>: <code>Files/costs/</code>, <code>Files/metrics/</code>, <code>Files/logs/</code>, <code>Files/resource-metadata/</code>
+<p>Reads raw Parquet files from ADLS Gen2 shortcuts and writes Delta tables into the schema-enabled Lakehouse <code>Tables/dbo/</code> section.</p>
+<p><strong>Input</strong>: <code>Files/costs/</code>, <code>Files/metadata/</code>, <code>Files/telemetry/apprequests/</code>,
+<code>Files/telemetry/appdependencies/</code>, <code>Files/telemetry/appmetrics/</code>, <code>Files/diagnostics/audit/</code>,
+<code>Files/diagnostics/platformmetrics/</code>
 <strong>Output</strong>: <code>bronze_costs</code>, <code>bronze_metrics</code>, <code>bronze_logs</code>, <code>bronze_resource_metadata</code></p>
 <p>Key behaviors:</p>
 <ul>

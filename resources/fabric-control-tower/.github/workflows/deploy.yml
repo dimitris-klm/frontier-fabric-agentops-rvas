@@ -76,5 +76,6 @@ jobs:
           python src/setup/setup_cosmos_mirroring.py \
             --workspace-id "${{ secrets.FABRIC_WORKSPACE_ID }}" \
             --cosmos-account "${{ secrets.COSMOS_ACCOUNT }}" \
-            --database "${{ secrets.COSMOS_DATABASE }}"
+            --database "${{ secrets.COSMOS_DATABASE }}" \
+            --connection-id "${{ secrets.COSMOS_CONNECTION_ID }}"
         continue-on-error: true

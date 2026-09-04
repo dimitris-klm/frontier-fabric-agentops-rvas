@@ -33,11 +33,11 @@ Raw telemetry — cost exports, platform metrics, diagnostic logs, and AI-agent 
 │  ┌─────────────────────────────────────┐   ┌────────────────────────────┐  │
 │  │  Lakehouse (OneLake)                │   │  Mirrored Database         │  │
 │  │  ├─ Files/                          │   │  Cosmos DB → Delta Tables  │  │
-│  │  │   ├─ costs/        (shortcut)    │   │  (near-real-time sync)     │  │
-│  │  │   ├─ metrics/      (shortcut)    │   └────────────┬───────────────┘  │
-│  │  │   ├─ logs/         (shortcut)    │                │                  │
-│  │  │   └─ resource-metadata/ (shortcut│                │                  │
-│  │  └─ Tables/                         │                │                  │
+│  │  │   ├─ costs/          (shortcut)  │   │  (near-real-time sync)     │  │
+│  │  │   ├─ metadata/       (shortcut)  │   └────────────┬───────────────┘  │
+│  │  │   ├─ telemetry/      (shortcuts) │                │                  │
+│  │  │   └─ diagnostics/    (shortcuts) │                │                  │
+│  │  └─ Tables/dbo/                     │                │                  │
 │  │      ├─ bronze_*  (raw Delta)       │◄───────────────┘                  │
 │  │      ├─ silver_*  (cleansed Delta)  │                                   │
 │  │      └─ gold_*    (aggregated Delta)│                                   │
@@ -113,7 +113,8 @@ The script performs the following:
 
 1. Creates (or reuses) a Fabric workspace assigned to the specified capacity.
 2. Creates an **Observability** lakehouse inside the workspace.
-3. Adds ADLS Gen2 shortcuts under `Files/` for each data container (`costs`, `metrics`, `logs`, `resource-metadata`).
+3. Adds ADLS Gen2 shortcuts under `Files/` for `costs`, `metadata`, the three required `am-*`
+  application telemetry containers, and the two required `insights-*` diagnostic containers.
 4. Uploads and imports all PySpark notebooks from `fabric/notebooks/`.
 5. Creates the **Load E2E Pipeline** and **Daily Refresh Pipeline**.
 
@@ -125,14 +126,16 @@ Enable Fabric Mirroring for the Cosmos DB database containing agent conversation
 python src/setup/setup_cosmos_mirroring.py \
   --workspace-id "<workspace-id>" \
   --cosmos-account "<cosmos-account-name>" \
-  --database "observability"
+  --database "agentsdb" \
+  --connection-id "<fabric-cosmos-connection-id>"
 ```
 
 The script:
 
-1. Enables the Cosmos DB account for Fabric Mirroring (continuous backup, analytical store).
-2. Creates a mirrored database item in the Fabric workspace.
-3. Configures table selection and replication for the `conversations`, `messages`, and `feedback` containers.
+1. Resolves the participant-owned **Azure Cosmos DB v2** cloud connection by ID or account endpoint.
+2. Creates a mirrored database definition for the Cosmos DB database in the Fabric workspace.
+3. Starts replication and confirms that Mirroring reaches a running state. Verify that the
+   `conversations` and `interactions` containers from Challenge 1 appear as mirrored tables.
 
 ### 4. Run Notebooks
 
@@ -151,9 +154,11 @@ To trigger all four in sequence, open the **Load E2E Pipeline** in Fabric and cl
 
 ### 01_bronze_ingestion.ipynb
 
-Reads raw Parquet files from ADLS Gen2 shortcuts and writes Delta tables into the Lakehouse `Tables/` section.
+Reads raw Parquet files from ADLS Gen2 shortcuts and writes Delta tables into the schema-enabled Lakehouse `Tables/dbo/` section.
 
-**Input**: `Files/costs/`, `Files/metrics/`, `Files/logs/`, `Files/resource-metadata/`
+**Input**: `Files/costs/`, `Files/metadata/`, `Files/telemetry/apprequests/`,
+`Files/telemetry/appdependencies/`, `Files/telemetry/appmetrics/`, `Files/diagnostics/audit/`,
+`Files/diagnostics/platformmetrics/`
 **Output**: `bronze_costs`, `bronze_metrics`, `bronze_logs`, `bronze_resource_metadata`
 
 Key behaviors:

@@ -80,6 +80,13 @@ reliability, and agent activity</strong>.</p>
 Gold</strong> medallion pipeline over the OneLake shortcuts and mirrored Cosmos data from Challenge 3. The
 win is not just populated tables. The win is correlation — proving that Fabric can connect the cost of
 running agents to the services, telemetry, resources, and conversations that created that spend.</p>
+<blockquote>
+<p>⚠️ <strong>Before you run the pipeline.</strong> The <strong>Load E2E Pipeline</strong> ends with a <code>Send Failure Notification</code>
+web activity that POSTs to the <code>WebhookUrl</code> pipeline parameter. Nothing in this repo provisions that
+endpoint — you must supply your own <strong>Logic App</strong> (or any HTTP-triggered webhook) and pass its URL when
+you run the pipeline. Leaving the placeholder default in place means the notification activity itself
+fails whenever an upstream notebook fails.</p>
+</blockquote>
 <h2 id="objectives">Objectives<a class="anchor" href="#objectives" aria-hidden="true">#</a></h2>
 <p>By the end of this challenge you will have:</p>
 <ul>
