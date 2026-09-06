@@ -17,8 +17,8 @@ This is the customer-facing payoff. Keep teams focused on the business questions
 ornamentation:
 
 1. **Reliability** — Which agents are healthy? Where are errors and latency spikes coming from?
-2. **Cost** — What is each agent, service, team, or use case costing?
-3. **Performance** — Are we meeting SLAs, and how much traffic/tokens/capacity are we consuming?
+2. **Cost** — What is each service or Azure resource costing?
+3. **Performance** — Are we meeting SLAs, and how much traffic and token usage are we seeing?
 
 Your job is to connect every visual back to one of those questions, then verify the semantic model is
 trustworthy: correct relationships, correct DAX, and Direct Lake over the Challenge 4 Gold tables.
@@ -31,52 +31,84 @@ agent/service/resource/date, and can explain which Gold table powers each answer
 1. **Start with populated Gold tables**
    - Confirm Challenge 4 produced the Gold data products listed in [`docs/architecture.md`](../docs/architecture.md):
      `gold_cost_summary`, `gold_operational_metrics`, `gold_agent_analytics`,
-     `gold_capacity_usage`, `gold_resource_inventory`, `dim_date`, and `dim_resource`.
+     `gold_resource_inventory`, `dim_date`, and `dim_resource`.
+   - If either dimension is missing, run `05_semantic_model_dimensions.ipynb` after notebooks 03 and 04.
    - If using the provided JSON, note its display names: `CostSummary`, `OperationalMetrics`,
-     `AgentAnalytics`, `CapacityUsage`, `ResourceInventory`, and `Calendar`.
+    `AgentAnalytics`, `ResourceInventory`, and `Calendar`.
 
 2. **Create the Direct Lake semantic model**
    - Create a model from the Lakehouse Gold tables, or import/adapt:
      [`resources/fabric-control-tower/src/setup/semantic_model.json`](../resources/fabric-control-tower/src/setup/semantic_model.json).
-   - Bind fact tables to the Gold Delta entities.
-   - Build relationships from facts to the date and resource dimensions.
-   - Mark/filter date fields consistently so YTD/MTD and rolling periods work.
+   - For a manual model, rename the tables to `CostSummary`, `OperationalMetrics`,
+     `AgentAnalytics`, `ResourceInventory`, and `Calendar`.
+   - Create these active one-to-many (`1:*`) relationships with single-direction filtering from the
+     dimensions:
+     - `Calendar[Date]` to `CostSummary[period_start]`
+     - `Calendar[Date]` to `OperationalMetrics[metric_date]`
+     - `Calendar[Date]` to `AgentAnalytics[interaction_date]`
+     - `ResourceInventory[resource_id]` to `CostSummary[resource_id]`
+   - Delete or deactivate conflicting auto-detected relationships.
+   - Mark `Calendar` as the date table using the `Date` column so `TOTALYTD` and `DATEADD` resolve
+     correctly; the provided JSON already sets `dataCategory: "Time"` on the table.
+   - Replace the `DatabaseQuery` placeholders with the Challenge 3 SQL analytics endpoint and
+     Lakehouse database name before deploying the JSON definition.
 
 3. **Author the key measures**
-   Use the README measures as the baseline. At minimum, verify `TotalCost`, `ErrorRate`,
-   `P95Latency`, and cost-per-agent/cost-per-request.
+  Use these formulas when the model was created manually from the Lakehouse tables. The provided
+  JSON uses friendly aliases for some physical columns but defines equivalent measures.
 
    ```DAX
-   TotalCost = SUM(fact_costs[BilledCost])
+  TotalCost = SUM(CostSummary[monthly_cost])
+
+  AvgMonthlyCost =
+  AVERAGEX(
+        VALUES(CostSummary[period_start]),
+        [TotalCost]
+  )
+
+  CostYTD = TOTALYTD([TotalCost], Calendar[Date])
+
+  CostMoMChange =
+  VAR CurrentPeriodCost = [TotalCost]
+  VAR PriorPeriodCost =
+        CALCULATE(
+              [TotalCost],
+              DATEADD(Calendar[Date], -1, MONTH)
+        )
+  RETURN
+        DIVIDE(CurrentPeriodCost - PriorPeriodCost, PriorPeriodCost)
 
    ErrorRate =
    DIVIDE(
-       COUNTROWS(FILTER(fact_operations, [Severity] = "Error")),
-       COUNTROWS(fact_operations)
+         SUM(OperationalMetrics[error_count]),
+         SUM(OperationalMetrics[total_events]),
+         0
    )
 
-   P95Latency = PERCENTILE.INC(fact_operations[DurationMs], 0.95)
+  P95Latency = AVERAGE(OperationalMetrics[latency_p95_ms])
 
-   CostMoM% =
-   VAR CurrentMonth = [TotalCost]
-   VAR PreviousMonth = CALCULATE([TotalCost], DATEADD(dim_date[Date], -1, MONTH))
-   RETURN DIVIDE(CurrentMonth - PreviousMonth, PreviousMonth, 0)
+  Availability = AVERAGE(OperationalMetrics[availability_pct])
 
-   CostPerAgent =
-   DIVIDE([TotalCost], DISTINCTCOUNT(fact_agent_analytics[AgentId]))
+  TotalConversations = SUM(AgentAnalytics[conversation_count])
+
+  AvgResponseTime = AVERAGE(AgentAnalytics[avg_response_time_ms])
+
+  TotalTokens = SUM(AgentAnalytics[total_tokens])
    ```
 
-   Also check the README list: `CapacityUtilization`, `AvgSatisfaction`, and `ConversationCount`.
-   If the team imported the provided JSON, adapt the column names to the model's table names rather
-   than creating duplicate disconnected measures.
+  Format cost measures as currency, `CostMoMChange` and `ErrorRate` as percentages, counts as whole
+  numbers, and latency and response time as two-decimal numbers. `availability_pct` already stores
+  percentage points, so format `Availability` with a literal `%` suffix (`0.00"%"`) rather than a
+  true percentage format, which would multiply the value by 100.
 
 4. **Build the three report pages**
    - **Reliability:** error rate trend by agent/error type, P95/P99 latency, availability, pipeline health.
    - **Cost:** cost by service/agent, MoM trend and forecast, run rate by team/use case, top cost drivers.
-   - **Performance:** throughput, prompt/completion token consumption, satisfaction trend, capacity utilization.
+  - **Performance:** conversations, interactions, sessions, token consumption, and response time by model/topic.
 
 5. **Verify Direct Lake**
-   - Gold-backed tables show storage mode = **Direct Lake**.
+   - All five model tables show storage mode = **Direct Lake**; `Calendar` and `ResourceInventory`
+     bind to `dim_date` and `dim_resource`.
    - There is no imported data copy and no scheduled refresh dependency.
    - The report reads Delta directly after pipeline runs. If Gold schema changed, resync model metadata.
 
@@ -90,10 +122,11 @@ Have the team present the report as if leadership is in the room:
 
 Then test the model:
 
-- Select one agent/service/resource and confirm cross-filtering updates all relevant visuals.
+- Confirm the shared date slicer updates all three pages, then verify resource filtering across cost
+  and inventory visuals.
 - Open the model view and show fact-to-date/resource relationships.
 - Show storage mode = Direct Lake for Gold-backed tables.
-- Inspect at least `TotalCost`, `ErrorRate`, `P95Latency`, and cost-per-agent/request DAX.
+- Inspect at least `TotalCost`, `ErrorRate`, `P95Latency`, `TotalConversations`, and `TotalTokens` DAX.
 
 ✅ Pass when the team answers the three questions live and the model is confirmed Direct Lake.
 
@@ -103,7 +136,8 @@ Then test the model:
 |---|---|
 | Semantic model not bound to Lakehouse **Gold** tables | Rebind to the Gold Delta entities from Challenge 4; do not build visuals directly on Bronze/Silver or scratch tables |
 | Relationships missing → totals look right but slicers lie | Recreate fact-to-date and fact-to-resource relationships; test with a single date/resource selection |
-| Direct Lake falls back to DirectQuery because of unsupported DAX/model behavior | Simplify the measure/model pattern; keep transformations in Gold, not in the semantic model |
+| `dim_date` or `dim_resource` is missing | Run `05_semantic_model_dimensions.ipynb` after both Gold-producing notebooks finish |
+| Direct Lake falls back to DirectQuery because of unsupported DAX/model behavior | Simplify the measure/model pattern; keep transformations in Gold or the dimension notebook, not in the semantic model |
 | Measures reference wrong columns after importing/adapting the JSON | Compare table names in `semantic_model.json` with the team's Lakehouse schema and update DAX once, centrally |
 | Power BI license/capacity needed to publish or share | Use the Fabric workspace assigned to capacity from Challenge 0; publish within that workspace |
 | Gold data changed but the model appears stale | Direct Lake auto-reflects data rows, but schema changes may require model metadata re-sync |
