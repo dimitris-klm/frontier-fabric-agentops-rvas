@@ -48,7 +48,8 @@ agent/service/resource/date, and can explain which Gold table powers each answer
      - `Calendar[Date]` to `AgentAnalytics[interaction_date]`
      - `ResourceInventory[resource_id]` to `CostSummary[resource_id]`
    - Delete or deactivate conflicting auto-detected relationships.
-   - Mark/filter date fields consistently so YTD/MTD and rolling periods work.
+   - Mark `Calendar` as the date table using the `Date` column so `TOTALYTD` and `DATEADD` resolve
+     correctly; the provided JSON already sets `dataCategory: "Time"` on the table.
    - Replace the `DatabaseQuery` placeholders with the Challenge 3 SQL analytics endpoint and
      Lakehouse database name before deploying the JSON definition.
 
@@ -96,8 +97,9 @@ agent/service/resource/date, and can explain which Gold table powers each answer
    ```
 
   Format cost measures as currency, `CostMoMChange` and `ErrorRate` as percentages, counts as whole
-  numbers, and latency, response time, and availability as two-decimal numbers. `availability_pct`
-  already stores percentage points, so do not apply percentage formatting to `Availability`.
+  numbers, and latency and response time as two-decimal numbers. `availability_pct` already stores
+  percentage points, so format `Availability` with a literal `%` suffix (`0.00"%"`) rather than a
+  true percentage format, which would multiply the value by 100.
 
 4. **Build the three report pages**
    - **Reliability:** error rate trend by agent/error type, P95/P99 latency, availability, pipeline health.

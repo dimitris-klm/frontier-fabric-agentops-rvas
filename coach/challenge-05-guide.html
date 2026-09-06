@@ -117,7 +117,8 @@ dimensions:<ul>
 </ul>
 </li>
 <li>Delete or deactivate conflicting auto-detected relationships.</li>
-<li>Mark/filter date fields consistently so YTD/MTD and rolling periods work.</li>
+<li>Mark <code>Calendar</code> as the date table using the <code>Date</code> column so <code>TOTALYTD</code> and <code>DATEADD</code> resolve
+correctly; the provided JSON already sets <code>dataCategory: &quot;Time&quot;</code> on the table.</li>
 <li>Replace the <code>DatabaseQuery</code> placeholders with the Challenge 3 SQL analytics endpoint and
 Lakehouse database name before deploying the JSON definition.</li>
 </ul>
@@ -157,8 +158,9 @@ Lakehouse database name before deploying the JSON definition.</li>
 <p>  TotalTokens = SUM(AgentAnalytics[total_tokens])</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>
   Format cost measures as currency, `CostMoMChange` and `ErrorRate` as percentages, counts as whole
-  numbers, and latency, response time, and availability as two-decimal numbers. `availability_pct`
-  already stores percentage points, so do not apply percentage formatting to `Availability`.
+  numbers, and latency and response time as two-decimal numbers. `availability_pct` already stores
+  percentage points, so format `Availability` with a literal `%` suffix (`0.00&quot;%&quot;`) rather than a
+  true percentage format, which would multiply the value by 100.
 
 4. **Build the three report pages**
 - **Reliability:** error rate trend by agent/error type, P95/P99 latency, availability, pipeline health.

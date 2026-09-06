@@ -107,6 +107,8 @@ Create the core measures called out in the Fabric Control Tower README:
 - `AvgResponseTime`
 
 Add time intelligence so the report can show **YTD**, **MTD**, prior period, and rolling 30-day views.
+Mark `Calendar` as the date table using the `Date` column — `CostYTD` and `CostMoMChange` rely on
+`TOTALYTD` and `DATEADD`, which need a marked date table to resolve correctly.
 The measures do not need to be fancy, but they must be correct and reusable across pages.
 
 ### 3. Build the Reliability page

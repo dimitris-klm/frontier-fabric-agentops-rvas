@@ -190,6 +190,8 @@ slicer or one resource filter to control the related report visuals.</p>
 <li><code>AvgResponseTime</code></li>
 </ul>
 <p>Add time intelligence so the report can show <strong>YTD</strong>, <strong>MTD</strong>, prior period, and rolling 30-day views.
+Mark <code>Calendar</code> as the date table using the <code>Date</code> column — <code>CostYTD</code> and <code>CostMoMChange</code> rely on
+<code>TOTALYTD</code> and <code>DATEADD</code>, which need a marked date table to resolve correctly.
 The measures do not need to be fancy, but they must be correct and reusable across pages.</p>
 <h3 id="3-build-the-reliability-page">3. Build the Reliability page<a class="anchor" href="#3-build-the-reliability-page" aria-hidden="true">#</a></h3>
 <p>Design this page around the question: <strong>Which agents are healthy, and where are the errors?</strong></p>
