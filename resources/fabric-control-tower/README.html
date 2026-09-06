@@ -56,6 +56,7 @@
           <li><a class="h3" href="#01bronzeingestionipynb">01_bronze_ingestion.ipynb</a></li>
           <li><a class="h3" href="#02silvertransformationipynb">02_silver_transformation.ipynb</a></li>
           <li><a class="h3" href="#03goldaggregationipynb">03_gold_aggregation.ipynb</a></li>
+          <li><a class="h3" href="#05semanticmodeldimensionsipynb">05_semantic_model_dimensions.ipynb</a></li>
           <li><a class="h3" href="#04cosmosmirroringtransformipynb">04_cosmos_mirroring_transform.ipynb</a></li>
           <li><a class="h2" href="#pipeline-schedule">Pipeline Schedule</a></li>
           <li><a class="h2" href="#semantic-model">Semantic Model</a></li>
@@ -269,10 +270,6 @@ python src/setup/setup_fabric_workspace.py \
 <td>Daily/monthly cost aggregates by subscription, resource group, service, and tag</td>
 </tr>
 <tr>
-<td><code>gold_capacity_usage</code></td>
-<td>Hourly capacity utilization (CPU, memory, DTU) with percentile bands</td>
-</tr>
-<tr>
 <td><code>gold_operational_metrics</code></td>
 <td>Error rates, latency percentiles (p50/p95/p99), availability per service</td>
 </tr>
@@ -282,15 +279,22 @@ python src/setup/setup_fabric_workspace.py \
 </tr>
 <tr>
 <td><code>gold_agent_analytics</code></td>
-<td>Conversation counts, token usage, response times, satisfaction scores</td>
+<td>Conversation counts, token usage, and response times by model and topic</td>
 </tr>
-<tr>
+</tbody></table></div>
+<h3 id="05semanticmodeldimensionsipynb">05_semantic_model_dimensions.ipynb<a class="anchor" href="#05semanticmodeldimensionsipynb" aria-hidden="true">#</a></h3>
+<p>Creates the physical Direct Lake dimensions after notebooks 03 and 04 have populated the Gold layer.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Table</th>
+<th>Description</th>
+</tr>
+</thead><tbody><tr>
 <td><code>dim_date</code></td>
-<td>Standard date dimension (fiscal calendar, holidays, working days)</td>
+<td>Continuous calendar spanning the dates present in the four Gold data products</td>
 </tr>
 <tr>
 <td><code>dim_resource</code></td>
-<td>Conformed resource dimension with hierarchy (subscription → resource group → resource)</td>
+<td>One current, deduplicated row per resource derived from <code>gold_resource_inventory</code></td>
 </tr>
 </tbody></table></div>
 <h3 id="04cosmosmirroringtransformipynb">04_cosmos_mirroring_transform.ipynb<a class="anchor" href="#04cosmosmirroringtransformipynb" aria-hidden="true">#</a></h3>
@@ -301,7 +305,7 @@ python src/setup/setup_fabric_workspace.py \
 <ul>
 <li>Sessionizes messages into conversation threads.</li>
 <li>Calculates per-conversation metrics: message count, total tokens, elapsed time, resolution status.</li>
-<li>Joins feedback scores and computes rolling satisfaction averages.</li>
+<li>Aggregates conversations, interactions, token usage, and response time by model and topic.</li>
 <li>Handles late-arriving mirrored records with merge-on-read reconciliation.</li>
 </ul>
 <h2 id="pipeline-schedule">Pipeline Schedule<a class="anchor" href="#pipeline-schedule" aria-hidden="true">#</a></h2>
@@ -323,7 +327,7 @@ python src/setup/setup_fabric_workspace.py \
 </tbody></table></div>
 <p>Both pipelines include:</p>
 <ul>
-<li>Dependency ordering: Bronze → Silver → Gold → Semantic Model refresh.</li>
+<li>Dependency ordering: Bronze → Silver → Gold plus mirrored-agent transform → semantic-model dimensions.</li>
 <li>Retry policy: 2 retries with 5-minute backoff.</li>
 <li>Failure notifications via Fabric alerts (email and Teams webhook).</li>
 </ul>
@@ -443,7 +447,8 @@ fact_agent_analytics ──▶ dim_date</code></pre>
 │   │   ├── 01_bronze_ingestion.ipynb
 │   │   ├── 02_silver_transformation.ipynb
 │   │   ├── 03_gold_aggregation.ipynb
-│   │   └── 04_cosmos_mirroring_transform.ipynb
+│   │   ├── 04_cosmos_mirroring_transform.ipynb
+│   │   └── 05_semantic_model_dimensions.ipynb
 │   └── pipelines/
 │       ├── pipeline_load_e2e.json
 │       └── pipeline_daily_refresh.json
@@ -470,7 +475,7 @@ fact_agent_analytics ──▶ dim_date</code></pre>
         </article>
         
         <div class="filetree">
-          <div class="filetree-head">📁 fabric-control-tower — 15 files · click any file to view it here (syntax-highlighted)</div>
+          <div class="filetree-head">📁 fabric-control-tower — 18 files · click any file to view it here (syntax-highlighted)</div>
           <ul>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2F.github%2Fworkflows%2Fdeploy.yml"><span class="ic">›</span>fabric-control-tower/.github/workflows/deploy.yml</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2F.gitignore"><span class="ic">›</span>fabric-control-tower/.gitignore</a></li>
@@ -479,10 +484,13 @@ fact_agent_analytics ──▶ dim_date</code></pre>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fnotebooks%2F02_silver_transformation.ipynb"><span class="ic">›</span>fabric-control-tower/fabric/notebooks/02_silver_transformation.ipynb</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fnotebooks%2F03_gold_aggregation.ipynb"><span class="ic">›</span>fabric-control-tower/fabric/notebooks/03_gold_aggregation.ipynb</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fnotebooks%2F04_cosmos_mirroring_transform.ipynb"><span class="ic">›</span>fabric-control-tower/fabric/notebooks/04_cosmos_mirroring_transform.ipynb</a></li>
+            <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fnotebooks%2F05_semantic_model_dimensions.ipynb"><span class="ic">›</span>fabric-control-tower/fabric/notebooks/05_semantic_model_dimensions.ipynb</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fpipelines%2Fpipeline_daily_refresh.json"><span class="ic">›</span>fabric-control-tower/fabric/pipelines/pipeline_daily_refresh.json</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fpipelines%2Fpipeline_load_e2e.json"><span class="ic">›</span>fabric-control-tower/fabric/pipelines/pipeline_load_e2e.json</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Finfra%2Fmain.bicep"><span class="ic">›</span>fabric-control-tower/infra/main.bicep</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Finfra%2Fmain.parameters.json"><span class="ic">›</span>fabric-control-tower/infra/main.parameters.json</a></li>
+            <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2F__pycache__%2Fsetup_cosmos_mirroring.cpython-314.pyc"><span class="ic">›</span>fabric-control-tower/src/setup/__pycache__/setup_cosmos_mirroring.cpython-314.pyc</a></li>
+            <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2F__pycache__%2Fsetup_fabric_workspace.cpython-314.pyc"><span class="ic">›</span>fabric-control-tower/src/setup/__pycache__/setup_fabric_workspace.cpython-314.pyc</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2Frequirements.txt"><span class="ic">›</span>fabric-control-tower/src/setup/requirements.txt</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2Fsemantic_model.json"><span class="ic">›</span>fabric-control-tower/src/setup/semantic_model.json</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2Fsetup_cosmos_mirroring.py"><span class="ic">›</span>fabric-control-tower/src/setup/setup_cosmos_mirroring.py</a></li>
