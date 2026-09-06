@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/powerbi-desktop-samples/main/Report%20Theme%20JSON%20Schema/reportThemeSchema-2.140.json",
+  "name": "ObservabilityControlTower.json",
+  "dataColors": [
+    "#007C91",
+    "#D97706",
+    "#2E7D32",
+    "#1D4ED8",
+    "#7C3AED",
+    "#C62828"
+  ],
+  "background": "#F4F7F9",
+  "foreground": "#17212B",
+  "tableAccent": "#007C91",
+  "bad": "#C62828",
+  "good": "#2E7D32"
+}

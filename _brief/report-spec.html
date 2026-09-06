@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Observability Analytics Report Specification · Frontier Fabric AgentOps RVAS</title>
+  <meta name="description" content="Observability Analytics Report Specification">
+  <link rel="icon" type="image/png" href="../assets/logos/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/site.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <link rel="stylesheet" href="../assets/css/brand.css">
+  <link rel="stylesheet" href="../assets/css/shell.css">
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <header class="nav" role="banner">
+    <div class="nav-inner">
+      <a class="brand" href="../index.html" aria-label="RVAS — Frontier Fabric AgentOps">
+        <img src="../assets/img/logo-full.png" alt="RVAP" class="rvap-nav-logo" height="32">
+      </a>
+      <nav class="nav-links" id="navLinks" aria-label="Primary">
+        <a href="../index.html">Home</a>
+        <a href="../builder.html">Builder</a>
+        <a href="../code.html">Code</a>
+        <a class="cta" href="../builder.html">Compose your delivery →</a>
+        <a class="gh" href="https://github.com/microsoft/frontier-fabric-agentops-rvas" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="icon-btn nav-toggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="navLinks">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="doc-wrap">
+    <div class="doc-shell">
+      
+      <aside class="toc" aria-label="On this page">
+        <div class="toc-title">On this page</div>
+        <ul>
+          <li><a class="h2" href="#target">Target</a></li>
+          <li><a class="h2" href="#audience-and-purpose">Audience And Purpose</a></li>
+          <li><a class="h2" href="#verified-model-inventory">Verified Model Inventory</a></li>
+          <li><a class="h2" href="#page-plan">Page Plan</a></li>
+          <li><a class="h3" href="#1-reliability">1. Reliability</a></li>
+          <li><a class="h3" href="#2-cost">2. Cost</a></li>
+          <li><a class="h3" href="#3-performance">3. Performance</a></li>
+          <li><a class="h2" href="#canonical-design-contract">Canonical Design Contract</a></li>
+          <li><a class="h2" href="#validation">Validation</a></li>
+        </ul>
+      </aside>
+      <main class="doc-main">
+        <div class="breadcrumb"><a href="../index.html">Home</a> <span class="sep">/</span> <span>Observability Analytics Report Specification</span></div>
+        <article class="article prose">
+<h1 id="observability-analytics-report-specification">Observability Analytics Report Specification</h1>
+<p>Status: Locked and approved for implementation</p>
+<p>Approval basis: On 2026-09-04, the user explicitly requested that the previously provided three-page report instructions be implemented directly in Fabric.</p>
+<h2 id="target">Target<a class="anchor" href="#target" aria-hidden="true">#</a></h2>
+<ul>
+<li>Workspace: <code>Observability-Analytics</code></li>
+<li>Workspace ID: <code>7d793729-4bed-4efb-b43a-20e6a5edc674</code></li>
+<li>Semantic model: <code>Observability Analytics</code></li>
+<li>Semantic model ID: <code>feea7d92-f707-47aa-8e9d-fc8bfe89f5ed</code></li>
+<li>Report name: <code>Observability Analytics Report</code></li>
+<li>Delivery: Create directly in Microsoft Fabric</li>
+</ul>
+<h2 id="audience-and-purpose">Audience And Purpose<a class="anchor" href="#audience-and-purpose" aria-hidden="true">#</a></h2>
+<ul>
+<li>Audience: Platform operators and engineering leadership</li>
+<li>Purpose: Monitor reliability, cost, and agent workload performance from one operational report</li>
+<li>Success criteria: Three complete data-bound pages; expected cross-filtering; sensible measure values; all five source tables remain Direct Lake</li>
+</ul>
+<h2 id="verified-model-inventory">Verified Model Inventory<a class="anchor" href="#verified-model-inventory" aria-hidden="true">#</a></h2>
+<ul>
+<li><code>Calendar</code>: date attributes; Direct Lake</li>
+<li><code>ResourceInventory</code>: resource dimensions; Direct Lake</li>
+<li><code>OperationalMetrics</code>: reliability facts and <code>ErrorRate</code>, <code>P95Latency</code>, <code>Availability</code>; Direct Lake</li>
+<li><code>CostSummary</code>: cost facts and <code>TotalCost</code>, <code>CostYTD</code>, <code>AvgMonthlyCost</code>, <code>CostMoMChange</code>; Direct Lake</li>
+<li><code>AgentAnalytics</code>: workload facts and <code>TotalConversations</code>, <code>AvgResponseTime</code>, <code>TotalTokens</code>; Direct Lake</li>
+<li>Four active many-to-one relationships connect the facts to <code>Calendar</code> and cost to <code>ResourceInventory</code></li>
+</ul>
+<h2 id="page-plan">Page Plan<a class="anchor" href="#page-plan" aria-hidden="true">#</a></h2>
+<h3 id="1-reliability">1. Reliability<a class="anchor" href="#1-reliability" aria-hidden="true">#</a></h3>
+<ul>
+<li>Slicers: <code>Calendar[Date]</code> as Between; <code>OperationalMetrics[service_name]</code></li>
+<li>KPI cards: <code>ErrorRate</code>, <code>P95Latency</code>, <code>Availability</code></li>
+<li>Line chart: <code>Calendar[Date]</code> by <code>ErrorRate</code> and <code>P95Latency</code></li>
+<li>Clustered column chart: <code>OperationalMetrics[service_name]</code> by <code>ErrorRate</code></li>
+</ul>
+<h3 id="2-cost">2. Cost<a class="anchor" href="#2-cost" aria-hidden="true">#</a></h3>
+<ul>
+<li>Slicers: <code>Calendar[Date]</code> as Between; <code>ResourceInventory[resource_name]</code></li>
+<li>KPI cards: <code>TotalCost</code>, <code>CostYTD</code>, <code>AvgMonthlyCost</code>, <code>CostMoMChange</code></li>
+<li>Line chart: <code>Calendar[Date]</code> by <code>TotalCost</code></li>
+<li>Bar chart: <code>ResourceInventory[resource_name]</code> by <code>TotalCost</code></li>
+<li>Table: <code>ResourceInventory[resource_name]</code>, <code>ResourceInventory[resource_type]</code>, <code>ResourceInventory[resource_group]</code>, <code>TotalCost</code></li>
+</ul>
+<h3 id="3-performance">3. Performance<a class="anchor" href="#3-performance" aria-hidden="true">#</a></h3>
+<ul>
+<li>Slicers: <code>Calendar[Date]</code> as Between; <code>AgentAnalytics[model_name]</code></li>
+<li>KPI cards: <code>TotalConversations</code>, <code>AvgResponseTime</code>, <code>TotalTokens</code></li>
+<li>Line chart: <code>Calendar[Date]</code> by <code>TotalConversations</code>, <code>AvgResponseTime</code>, and <code>TotalTokens</code></li>
+<li>Bar chart: <code>AgentAnalytics[model_name]</code> by <code>TotalConversations</code></li>
+<li>Table: <code>AgentAnalytics[model_name]</code>, <code>AgentAnalytics[topic_classification]</code>, <code>TotalConversations</code>, <code>AvgResponseTime</code>, <code>TotalTokens</code></li>
+</ul>
+<h2 id="canonical-design-contract">Canonical Design Contract<a class="anchor" href="#canonical-design-contract" aria-hidden="true">#</a></h2>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-yaml">Design Brief:
+  generated_by: powerbi-report-design
+  contract_version: 1
+  mode: greenfield
+  design_identity:
+    tone: operational control tower
+    signature: compact status header with a consistent KPI rail
+  canvas: { width: 1920, height: 1080, margin: 32, gutter: 24, snap: 8 }
+  palette:
+    canvas: &quot;#F4F7F9&quot;
+    surface: &quot;#FFFFFF&quot;
+    text: &quot;#17212B&quot;
+    muted: &quot;#5B6875&quot;
+    reliability: &quot;#007C91&quot;
+    latency: &quot;#D97706&quot;
+    availability: &quot;#2E7D32&quot;
+    cost: &quot;#1D4ED8&quot;
+    performance: &quot;#7C3AED&quot;
+    alert: &quot;#C62828&quot;
+  typography:
+    family: Segoe UI
+    page_title_pt: 24
+    visual_title_pt: 13
+    body_pt: 11
+  accessibility:
+    minimum_contrast: WCAG AA
+    color_is_not_the_only_status_signal: true
+    descriptive_titles_and_alt_text: true
+    logical_tab_order: true
+  pages:
+    - name: Reliability
+      role: landing
+      archetype: Operational Monitor
+      layout_variant: KPI rail plus trend and service comparison
+      variant_rationale: Reliability requires immediate status scanning followed by temporal and service-level diagnosis.
+      layout_contract:
+        header: [32, 24, 1856, 88]
+        slicers: [1120, 32, 768, 64]
+        kpi_rail: [32, 136, 1856, 176]
+        trend: [32, 336, 1160, 696]
+        comparison: [1216, 336, 672, 696]
+        space_audit: { empty_cell_pct: 0, unplaced_regions: [] }
+    - name: Cost
+      role: detail
+      archetype: Analytical Canvas
+      layout_variant: KPI rail plus trend, ranking, and detail table
+      variant_rationale: Cost analysis needs headline totals, time movement, resource comparison, and inspectable inventory detail.
+      layout_contract:
+        header: [32, 24, 1856, 88]
+        slicers: [1120, 32, 768, 64]
+        kpi_rail: [32, 136, 1856, 176]
+        trend: [32, 336, 900, 328]
+        ranking: [956, 336, 932, 328]
+        detail: [32, 688, 1856, 344]
+        space_audit: { empty_cell_pct: 0, unplaced_regions: [] }
+    - name: Performance
+      role: detail
+      archetype: Analytical Canvas
+      layout_variant: KPI rail plus trend, model ranking, and topic detail
+      variant_rationale: Agent performance needs temporal diagnosis, model comparison, and topic-level detail in one analytical flow.
+      layout_contract:
+        header: [32, 24, 1856, 88]
+        slicers: [1120, 32, 768, 64]
+        kpi_rail: [32, 136, 1856, 176]
+        trend: [32, 336, 900, 328]
+        ranking: [956, 336, 932, 328]
+        detail: [32, 688, 1856, 344]
+        space_audit: { empty_cell_pct: 0, unplaced_regions: [] }</code></pre>
+<h2 id="validation">Validation<a class="anchor" href="#validation" aria-hidden="true">#</a></h2>
+<ul>
+<li>Validate the PBIR definition after each authoring batch</li>
+<li>Confirm all three pages render with data</li>
+<li>Confirm page slicers filter the expected visuals</li>
+<li>Confirm every requested measure returns plausible values</li>
+<li>Confirm all five model table partitions remain <code>DirectLake</code></li>
+<li>Publish only after validation passes</li>
+</ul>
+
+        </article>
+        
+        
+        <div class="source-bar">
+          <a href="../index.html">← Back to all content</a>
+          <a href="https://github.com/microsoft/frontier-fabric-agentops-rvas/blob/main/_brief/report-spec.md" target="_blank" rel="noopener">View source on GitHub ↗</a>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <footer class="footer" role="contentinfo">
+    <div class="footer-inner">
+      <a class="brand" href="../index.html" aria-label="RVAS — Frontier Fabric AgentOps">
+        <img src="../assets/img/logo-full.png" alt="RVAP" class="rvap-nav-logo" height="28">
+      </a>
+      <p>Build an AgentOps Control Tower on Microsoft Fabric. Build. Innovate. Scale real value.</p>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="../index.html">Home</a>
+        <a href="../builder.html">Builder</a>
+        <a href="../code.html">Code</a>
+        <a href="../builder.html">Compose your delivery</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  
+  <script>
+    // syntax highlight (skip mermaid)
+    if (window.hljs) document.querySelectorAll('pre code').forEach(el => window.hljs.highlightElement(el));
+    // copy buttons
+    document.querySelectorAll('.code-copy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const code = btn.parentElement.querySelector('code');
+        navigator.clipboard.writeText(code.innerText).then(() => {
+          const t = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => btn.textContent = t, 1400);
+        });
+      });
+    });
+    // TOC scroll-spy
+    (function () {
+      const links = [...document.querySelectorAll('.toc a')];
+      if (!links.length) return;
+      const map = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+      const obs = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            links.forEach(l => l.classList.remove('active'));
+            const a = map.get(e.target.id); if (a) a.classList.add('active');
+          }
+        });
+      }, { rootMargin: '0px 0px -75% 0px', threshold: 0 });
+      document.querySelectorAll('.prose h2[id], .prose h3[id]').forEach(h => obs.observe(h));
+    })();
+  </script>
+  <script src="../assets/js/shell.js"></script>
+</body>
+</html>

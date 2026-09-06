@@ -59,9 +59,9 @@ Raw telemetry — cost exports, platform metrics, diagnostic logs, and AI-agent 
 │                    │                                                        │
 │  ┌─────────────────▼───────────────────┐   ┌────────────────────────────┐  │
 │  │  Semantic Model (Direct Lake)       │──▶│  Power BI Reports          │  │
-│  │  fact_costs, fact_metrics, ...      │   │  Cost Overview             │  │
-│  │  dim_resource, dim_date, ...        │   │  Capacity Utilization      │  │
-│  │  Measures: TotalCost, ErrorRate ... │   │  Operational Health        │  │
+│  │  CostSummary, OperationalMetrics    │   │  Cost Overview             │  │
+│  │  AgentAnalytics + dimensions        │   │  Operational Health        │  │
+│  │  Measures: TotalCost, ErrorRate ... │   │  Performance               │  │
 │  └─────────────────────────────────────┘   │  Agent Performance         │  │
 │                                            │  Resource Inventory        │  │
 │                                            └────────────────────────────┘  │
@@ -192,12 +192,18 @@ Creates analytical aggregates consumed by the semantic model.
 | Table | Description |
 |---|---|
 | `gold_cost_summary` | Daily/monthly cost aggregates by subscription, resource group, service, and tag |
-| `gold_capacity_usage` | Hourly capacity utilization (CPU, memory, DTU) with percentile bands |
 | `gold_operational_metrics` | Error rates, latency percentiles (p50/p95/p99), availability per service |
 | `gold_resource_inventory` | Current and historical resource state with SCD Type 2 tracking |
-| `gold_agent_analytics` | Conversation counts, token usage, response times, satisfaction scores |
-| `dim_date` | Standard date dimension (fiscal calendar, holidays, working days) |
-| `dim_resource` | Conformed resource dimension with hierarchy (subscription → resource group → resource) |
+| `gold_agent_analytics` | Conversation counts, token usage, and response times by model and topic |
+
+### 05_semantic_model_dimensions.ipynb
+
+Creates the physical Direct Lake dimensions after notebooks 03 and 04 have populated the Gold layer.
+
+| Table | Description |
+|---|---|
+| `dim_date` | Continuous calendar spanning the dates present in the four Gold data products |
+| `dim_resource` | One current, deduplicated row per resource derived from `gold_resource_inventory` |
 
 ### 04_cosmos_mirroring_transform.ipynb
 
@@ -210,7 +216,7 @@ Key behaviors:
 
 - Sessionizes messages into conversation threads.
 - Calculates per-conversation metrics: message count, total tokens, elapsed time, resolution status.
-- Joins feedback scores and computes rolling satisfaction averages.
+- Aggregates conversations, interactions, token usage, and response time by model and topic.
 - Handles late-arriving mirrored records with merge-on-read reconciliation.
 
 ## Pipeline Schedule
@@ -222,7 +228,7 @@ Key behaviors:
 
 Both pipelines include:
 
-- Dependency ordering: Bronze → Silver → Gold → Semantic Model refresh.
+- Dependency ordering: Bronze → Silver → Gold plus mirrored-agent transform → semantic-model dimensions.
 - Retry policy: 2 retries with 5-minute backoff.
 - Failure notifications via Fabric alerts (email and Teams webhook).
 
@@ -233,34 +239,27 @@ The Direct Lake semantic model connects Power BI directly to Delta tables in One
 ### Tables and Relationships
 
 ```
-dim_date ──────────┐
-                   │ 1:*
-fact_costs ◄───────┤
-                   │ 1:*
-dim_resource ──────┤
-                   │ 1:*
-fact_metrics ◄─────┤
-                   │ 1:*
-fact_operations ◄──┘
-                   
-fact_agent_analytics ──▶ dim_date
+Calendar (dim_date) ──1:*──▶ CostSummary
+                    ├─1:*──▶ OperationalMetrics
+                    └─1:*──▶ AgentAnalytics
+
+ResourceInventory (dim_resource) ──1:*──▶ CostSummary
 ```
 
 ### Key Measures
 
 | Measure | Expression (DAX) |
 |---|---|
-| TotalCost | `SUM(fact_costs[BilledCost])` |
-| CostMoM% | Month-over-month cost change percentage |
-| CapacityUtilization | `AVERAGE(fact_metrics[CPUPercent])` |
-| ErrorRate | `DIVIDE(COUNTROWS(FILTER(fact_operations, [Severity] = "Error")), COUNTROWS(fact_operations))` |
-| P95Latency | `PERCENTILE.INC(fact_operations[DurationMs], 0.95)` |
-| AvgSatisfaction | `AVERAGE(fact_agent_analytics[SatisfactionScore])` |
-| ConversationCount | `DISTINCTCOUNT(fact_agent_analytics[ConversationId])` |
+| TotalCost | `SUM(CostSummary[monthly_cost])` |
+| CostMoMChange | Month-over-month cost change percentage |
+| ErrorRate | `DIVIDE(SUM(OperationalMetrics[error_count]), SUM(OperationalMetrics[total_requests]), 0)` |
+| P95Latency | `AVERAGE(OperationalMetrics[p95_latency_ms])` |
+| TotalConversations | `SUM(AgentAnalytics[total_conversations])` |
+| TotalTokens | `SUM(AgentAnalytics[total_tokens_used])` |
 
 ### Time Intelligence
 
-All cost and metric measures include time-intelligence variants: YTD, MTD, QTD, prior period, and rolling 30-day averages. These are generated via a calculation group applied to `dim_date`.
+The model includes YTD and prior-month cost measures using the physical `dim_date` table.
 
 ## Power BI Report
 
@@ -275,9 +274,8 @@ All cost and metric measures include time-intelligence variants: YTD, MTD, QTD, 
 | Page | Key Visuals |
 |---|---|
 | **Cost Overview** | KPI cards (total cost, MoM trend), cost-by-service bar chart, daily cost line chart with forecast, top-10 cost drivers table |
-| **Capacity Utilization** | Gauge charts per capacity metric, heatmap by resource and hour, utilization trend with threshold lines |
 | **Operational Health** | Error-rate trend, P95 latency sparklines, availability scorecards, log-severity breakdown donut chart |
-| **Agent Performance** | Conversation volume over time, avg response time, token consumption bar chart, satisfaction trend, resolution rate funnel |
+| **Agent Performance** | Conversation, interaction, and session volume; response time; token consumption by model and topic |
 | **Resource Inventory** | Resource count by type/region matrix, change timeline (SCD events), tag compliance percentage, orphaned resource list |
 
 ### Design Guidelines
@@ -308,7 +306,8 @@ fabric-control-tower/
 │   │   ├── 01_bronze_ingestion.ipynb
 │   │   ├── 02_silver_transformation.ipynb
 │   │   ├── 03_gold_aggregation.ipynb
-│   │   └── 04_cosmos_mirroring_transform.ipynb
+│   │   ├── 04_cosmos_mirroring_transform.ipynb
+│   │   └── 05_semantic_model_dimensions.ipynb
 │   └── pipelines/
 │       ├── pipeline_load_e2e.json
 │       └── pipeline_daily_refresh.json

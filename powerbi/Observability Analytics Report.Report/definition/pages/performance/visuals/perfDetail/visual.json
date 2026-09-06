@@ -1,0 +1,133 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "perfDetail",
+  "position": {
+    "x": 32,
+    "y": 688,
+    "z": 8,
+    "width": 1856,
+    "height": 344,
+    "tabOrder": 8
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "AgentAnalytics"
+                    }
+                  },
+                  "Property": "model_name"
+                }
+              },
+              "queryRef": "AgentAnalytics.model_name",
+              "nativeQueryRef": "model_name"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "AgentAnalytics"
+                    }
+                  },
+                  "Property": "topic_classification"
+                }
+              },
+              "queryRef": "AgentAnalytics.topic_classification",
+              "nativeQueryRef": "topic_classification"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "AgentAnalytics"
+                    }
+                  },
+                  "Property": "TotalConversations"
+                }
+              },
+              "queryRef": "AgentAnalytics.TotalConversations",
+              "nativeQueryRef": "TotalConversations"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "AgentAnalytics"
+                    }
+                  },
+                  "Property": "AvgResponseTime"
+                }
+              },
+              "queryRef": "AgentAnalytics.AvgResponseTime",
+              "nativeQueryRef": "AvgResponseTime"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "AgentAnalytics"
+                    }
+                  },
+                  "Property": "TotalTokens"
+                }
+              },
+              "queryRef": "AgentAnalytics.TotalTokens",
+              "nativeQueryRef": "TotalTokens"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Model and topic detail'"
+                }
+              }
+            },
+            "fontSize": {
+              "expr": {
+                "Literal": {
+                  "Value": "13D"
+                }
+              }
+            },
+            "fontColor": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#17212B'"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

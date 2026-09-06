@@ -82,7 +82,7 @@ answer operational questions <strong>live</strong> from the Gold Delta tables.</
 <h2 id="objectives">Objectives<a class="anchor" href="#objectives" aria-hidden="true">#</a></h2>
 <p>By the end of this challenge you will have:</p>
 <ul>
-<li>A <strong>Direct Lake semantic model</strong> over the Challenge 4 Gold tables.</li>
+<li>A <strong>Direct Lake semantic model</strong> over the four Challenge 4 Gold tables and two physical dimensions.</li>
 <li>Relationships from facts to the date and resource dimensions so filters behave correctly.</li>
 <li>Core DAX measures for cost, reliability, performance, and agent adoption.</li>
 <li>Power BI report pages mapped to the three business questions:
@@ -92,6 +92,7 @@ answer operational questions <strong>live</strong> from the Gold Delta tables.</
 <h2 id="prerequisites">Prerequisites<a class="anchor" href="#prerequisites" aria-hidden="true">#</a></h2>
 <ul>
 <li>✅ Challenge 4 complete — populated Gold tables in the Fabric Lakehouse.</li>
+<li><code>05_semantic_model_dimensions.ipynb</code> completed — populated <code>dim_date</code> and <code>dim_resource</code> tables.</li>
 <li>The Fabric Control Tower assets in
 <a href="../resources/fabric-control-tower/README.html"><code>resources/fabric-control-tower/</code></a>.</li>
 <li>The semantic model reference at
@@ -111,11 +112,11 @@ Gold data products and Core KPIs.</li>
 </tr>
 <tr>
 <td><strong>Cost</strong></td>
-<td>What is each service, agent, team, or use case costing? Which drivers are changing fastest?</td>
+<td>What is each service and Azure resource costing? Which drivers are changing fastest?</td>
 </tr>
 <tr>
 <td><strong>Performance</strong></td>
-<td>Are we meeting SLAs? How much traffic, token usage, satisfaction, and capacity are we seeing?</td>
+<td>Are we meeting SLAs? How much traffic, token usage, and response time are we seeing?</td>
 </tr>
 </tbody></table></div>
 <p>The Gold layer gives you the data products. The semantic model makes them trustworthy. The report makes
@@ -127,30 +128,66 @@ them usable under pressure.</p>
 <li><code>gold_cost_summary</code></li>
 <li><code>gold_operational_metrics</code></li>
 <li><code>gold_agent_analytics</code></li>
-<li><code>gold_capacity_usage</code></li>
-<li><code>gold_resource_inventory</code></li>
-<li><code>dim_date</code></li>
 <li><code>dim_resource</code></li>
+<li><code>dim_date</code></li>
 </ul>
 <p>Use the provided
 <a href="../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2Fsemantic_model.json"><code>src/setup/semantic_model.json</code></a> as
 the reference for table bindings, Direct Lake partitions, relationships, and starter measures. If your
 workspace uses the provided display names, you may see tables such as <code>CostSummary</code>,
-<code>OperationalMetrics</code>, <code>AgentAnalytics</code>, <code>CapacityUsage</code>, <code>ResourceInventory</code>, and <code>Calendar</code> mapped to
-the Gold entities.</p>
-<p>Make sure the model has relationships from the fact tables to the date and resource dimensions. This is
-what allows one date slicer or one resource filter to control the whole report.</p>
+<code>OperationalMetrics</code>, <code>AgentAnalytics</code>, <code>ResourceInventory</code>, and <code>Calendar</code> mapped to those Delta
+entities.</p>
+<p>If you create the model manually, rename the five tables as follows:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Lakehouse table</th>
+<th>Model table</th>
+</tr>
+</thead><tbody><tr>
+<td><code>gold_cost_summary</code></td>
+<td><code>CostSummary</code></td>
+</tr>
+<tr>
+<td><code>gold_operational_metrics</code></td>
+<td><code>OperationalMetrics</code></td>
+</tr>
+<tr>
+<td><code>gold_agent_analytics</code></td>
+<td><code>AgentAnalytics</code></td>
+</tr>
+<tr>
+<td><code>dim_resource</code></td>
+<td><code>ResourceInventory</code></td>
+</tr>
+<tr>
+<td><code>dim_date</code></td>
+<td><code>Calendar</code></td>
+</tr>
+</tbody></table></div>
+<p>Create these active one-to-many (<code>1:*</code>) relationships with single-direction filtering from each
+dimension to its fact table:</p>
+<ul>
+<li><code>Calendar[Date]</code> → <code>CostSummary[period_start]</code></li>
+<li><code>Calendar[Date]</code> → <code>OperationalMetrics[metric_date]</code></li>
+<li><code>Calendar[Date]</code> → <code>AgentAnalytics[interaction_date]</code></li>
+<li><code>ResourceInventory[resource_id]</code> → <code>CostSummary[resource_id]</code></li>
+</ul>
+<p>Delete or deactivate conflicting auto-detected relationships. These relationships allow one date
+slicer or one resource filter to control the related report visuals.</p>
+<p>If you import the JSON definition, replace <code>your-fabric-sql-endpoint</code> and <code>your-lakehouse-name</code> in the
+<code>DatabaseQuery</code> expression with the SQL analytics endpoint and Lakehouse database name from Challenge 3.</p>
 <h3 id="2-define-the-key-measures">2. Define the key measures<a class="anchor" href="#2-define-the-key-measures" aria-hidden="true">#</a></h3>
 <p>Create the core measures called out in the Fabric Control Tower README:</p>
 <ul>
 <li><code>TotalCost</code></li>
-<li><code>CostMoM%</code></li>
-<li><code>CapacityUtilization</code></li>
+<li><code>AvgMonthlyCost</code></li>
+<li><code>CostYTD</code></li>
+<li><code>CostMoMChange</code></li>
 <li><code>ErrorRate</code></li>
 <li><code>P95Latency</code></li>
-<li><code>AvgSatisfaction</code></li>
-<li><code>ConversationCount</code></li>
-<li>A cost-per-request or cost-per-agent measure</li>
+<li><code>Availability</code></li>
+<li><code>TotalConversations</code></li>
+<li><code>TotalTokens</code></li>
+<li><code>AvgResponseTime</code></li>
 </ul>
 <p>Add time intelligence so the report can show <strong>YTD</strong>, <strong>MTD</strong>, prior period, and rolling 30-day views.
 The measures do not need to be fancy, but they must be correct and reusable across pages.</p>
@@ -166,14 +203,14 @@ The measures do not need to be fancy, but they must be correct and reusable acro
 <p>A coach should be able to point at one unhealthy agent or service and ask, &quot;What changed?&quot; Your page
 should make the answer obvious.</p>
 <h3 id="4-build-the-cost-page">4. Build the Cost page<a class="anchor" href="#4-build-the-cost-page" aria-hidden="true">#</a></h3>
-<p>Design this page around the question: <strong>What is each agent or team costing us?</strong></p>
+<p>Design this page around the question: <strong>What is each service or Azure resource costing us?</strong></p>
 <p>Include visuals that cover:</p>
 <ul>
 <li>Total cost by service, resource group, agent, or tag.</li>
 <li>Month-over-month trend and forecast.</li>
 <li>Run rate by team or use case where tags support it.</li>
 <li>Top cost drivers table.</li>
-<li>Cost-per-request or cost-per-agent KPI.</li>
+<li>Average monthly cost and month-over-month change KPIs.</li>
 </ul>
 <p>Make the page useful for a FinOps conversation: show where spend is, who owns it, and whether it is
 getting better or worse.</p>
@@ -183,16 +220,16 @@ getting better or worse.</p>
 <ul>
 <li>Throughput by minute or hour.</li>
 <li>Prompt and completion token consumption.</li>
-<li>Satisfaction trend.</li>
-<li>Capacity utilization.</li>
-<li>Conversation volume and response-time trends.</li>
+<li>Conversation, interaction, and session volume.</li>
+<li>Response-time trends by model and topic.</li>
 </ul>
-<p>Connect performance to reliability and cost. High traffic is good only if latency, errors, satisfaction,
-and spend stay under control.</p>
+<p>Connect performance to reliability and cost. High traffic is good only if latency, errors, and spend
+stay under control.</p>
 <h3 id="6-confirm-direct-lake-mode">6. Confirm Direct Lake mode<a class="anchor" href="#6-confirm-direct-lake-mode" aria-hidden="true">#</a></h3>
 <p>Before you claim victory, prove the model is actually Direct Lake:</p>
 <ul>
-<li>Storage mode is <strong>Direct Lake</strong> for the Gold-backed tables.</li>
+<li>Storage mode is <strong>Direct Lake</strong> for all five model tables, including <code>Calendar</code> and
+<code>ResourceInventory</code>, which bind to the physical dimensions.</li>
 <li>The report is not using an imported copy of the data.</li>
 <li>There is no scheduled data refresh required for the report to see newly written Delta rows.</li>
 <li>After a pipeline run updates Gold, the report reflects the latest data once the model schema is in
@@ -203,8 +240,8 @@ sync.</li>
 <li><input disabled="" type="checkbox"> A working Power BI Control Tower report answers <strong>Reliability</strong>, <strong>Cost</strong>, and <strong>Performance</strong> live</li>
 <li><input disabled="" type="checkbox"> The semantic model is confirmed as <strong>Direct Lake</strong> over the Gold Delta tables</li>
 <li><input disabled="" type="checkbox"> Relationships to the date and resource dimensions are present and filters work across pages</li>
-<li><input disabled="" type="checkbox"> Measures are correct for at least <code>TotalCost</code>, <code>ErrorRate</code>, <code>P95Latency</code>, and cost-per-agent or cost-per-request</li>
-<li><input disabled="" type="checkbox"> Cross-filtering works: selecting an agent/service/resource changes the related cost, reliability, and performance visuals</li>
+<li><input disabled="" type="checkbox"> Measures are correct for at least <code>TotalCost</code>, <code>ErrorRate</code>, <code>P95Latency</code>, <code>TotalConversations</code>, and <code>TotalTokens</code></li>
+<li><input disabled="" type="checkbox"> Cross-filtering works: the shared date filter changes cost, reliability, and performance visuals; resource filters change cost and inventory visuals</li>
 <li><input disabled="" type="checkbox"> Your team can explain which Gold table powers each major page</li>
 </ul>
 <blockquote>
@@ -219,8 +256,8 @@ slicers and cross-filtering instead of switching back to raw tables.</p>
 <p><a href="../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2Fsemantic_model.json"><code>resources/fabric-control-tower/src/setup/semantic_model.json</code></a></p>
 <p>Look for:</p>
 <ul>
-<li>Gold table bindings such as <code>gold_cost_summary</code>, <code>gold_operational_metrics</code>,
-<code>gold_agent_analytics</code>, <code>gold_capacity_usage</code>, and <code>gold_resource_inventory</code>.</li>
+<li>Gold table bindings for <code>gold_cost_summary</code>, <code>gold_operational_metrics</code>, and
+<code>gold_agent_analytics</code>, plus <code>dim_date</code> and <code>dim_resource</code>.</li>
 <li><code>mode: &quot;directLake&quot;</code> partitions on the Gold-backed tables.</li>
 <li>Date relationships into the provided calendar/date table.</li>
 <li>Resource relationships into the resource inventory/dimension table.</li>
@@ -233,33 +270,56 @@ slicers and cross-filtering instead of switching back to raw tables.</p>
 
 <p>The reference README lists the key measures. Adapt names only if your semantic model uses different
 physical table names.</p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-DAX">TotalCost = SUM(fact_costs[BilledCost])
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-DAX">TotalCost = SUM(CostSummary[monthly_cost])
 
-CapacityUtilization = AVERAGE(fact_metrics[CPUPercent])
+AvgMonthlyCost =
+AVERAGEX(
+  VALUES(CostSummary[period_start]),
+  [TotalCost]
+)
+
+CostYTD = TOTALYTD([TotalCost], Calendar[Date])
+
+CostMoMChange =
+VAR CurrentPeriodCost = [TotalCost]
+VAR PriorPeriodCost =
+  CALCULATE(
+    [TotalCost],
+    DATEADD(Calendar[Date], -1, MONTH)
+  )
+RETURN
+  DIVIDE(CurrentPeriodCost - PriorPeriodCost, PriorPeriodCost)
 
 ErrorRate =
 DIVIDE(
-    COUNTROWS(FILTER(fact_operations, [Severity] = &quot;Error&quot;)),
-    COUNTROWS(fact_operations)
+  SUM(OperationalMetrics[error_count]),
+  SUM(OperationalMetrics[total_events]),
+  0
 )
 
-P95Latency = PERCENTILE.INC(fact_operations[DurationMs], 0.95)
+P95Latency = AVERAGE(OperationalMetrics[latency_p95_ms])
 
-AvgSatisfaction = AVERAGE(fact_agent_analytics[SatisfactionScore])
+Availability = AVERAGE(OperationalMetrics[availability_pct])
 
-ConversationCount = DISTINCTCOUNT(fact_agent_analytics[ConversationId])</code></pre>
-<p>If you imported the provided JSON model, compare these with the measures already defined on
-<code>CostSummary</code>, <code>OperationalMetrics</code>, <code>CapacityUsage</code>, and <code>AgentAnalytics</code>.</p>
+TotalConversations = SUM(AgentAnalytics[conversation_count])
+
+AvgResponseTime = AVERAGE(AgentAnalytics[avg_response_time_ms])
+
+TotalTokens = SUM(AgentAnalytics[total_tokens])</code></pre>
+<p>These formulas use the physical column names exposed when you create the model manually. If you
+imported the provided JSON model, its friendly model-column aliases are already reflected in the
+measures defined on <code>CostSummary</code>, <code>OperationalMetrics</code>, and <code>AgentAnalytics</code>.</p>
 </details>
 
 <details>
 <summary>Testing cross-filtering</summary>
 
-<p>Pick one agent, service, or resource and select it on a visual. Confirm all three pages respond:</p>
+<p>Use the shared date slicer and confirm all three pages respond. Then select a resource and confirm the
+cost and inventory visuals respond:</p>
 <ul>
 <li>Cost cards and trend narrow to that selection.</li>
 <li>Error rate and latency visuals change.</li>
-<li>Conversation volume, token usage, and satisfaction update.</li>
+<li>Conversation volume, token usage, and response time update for the selected date period.</li>
 </ul>
 <p>If only one visual changes, check relationships, inactive relationships, or mismatched dimension keys.</p>
 </details>
@@ -267,10 +327,10 @@ ConversationCount = DISTINCTCOUNT(fact_agent_analytics[ConversationId])</code></
 <details>
 <summary>Direct Lake sanity checks</summary>
 
-<p>In the semantic model settings or model view, confirm the Gold-backed tables use <strong>Direct Lake</strong> storage
-mode. Avoid unsupported transformations or DAX patterns that force a fallback path. If the Gold schema
-changed after your model was created, resync the model schema — Direct Lake reflects data changes, but
-new columns and renamed tables still need model metadata alignment.</p>
+<p>In the semantic model settings or model view, confirm all five tables use <strong>Direct Lake</strong> storage mode.
+<code>Calendar</code> binds to <code>dim_date</code>; <code>ResourceInventory</code> binds to <code>dim_resource</code>. Avoid unsupported
+transformations or DAX patterns that force a fallback path. If the source schema changed after your
+model was created, resync the model metadata.</p>
 </details>
 
 <h2 id="resources">Resources<a class="anchor" href="#resources" aria-hidden="true">#</a></h2>

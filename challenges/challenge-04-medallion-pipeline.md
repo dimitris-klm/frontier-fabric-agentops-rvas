@@ -105,20 +105,20 @@ listed in the reference architecture:
 |---|---|
 | `gold_cost_summary` | Daily/monthly cost by service, resource group, tag, and time window |
 | `gold_operational_metrics` | Error rates, latency percentiles, and availability by service |
-| `gold_capacity_usage` | Utilization signals for capacity planning |
 | `gold_resource_inventory` | SCD Type 2 resource inventory and governance history |
-| `gold_agent_analytics` | Conversations, tokens, response time, and satisfaction by agent |
+| `gold_agent_analytics` | Conversations, tokens, and response time by model and topic |
 | `dim_date`, `dim_resource` | Conformed dimensions for time intelligence and drill-down |
 
 Use `03_gold_aggregation.ipynb` for the Gold aggregation path, with
-`04_cosmos_mirroring_transform.ipynb` feeding the agent analytics product.
+`04_cosmos_mirroring_transform.ipynb` feeding the agent analytics product. After both complete, run
+`05_semantic_model_dimensions.ipynb` to materialize `dim_date` and `dim_resource` for Direct Lake.
 
 ### 4. Orchestrate the load
 
 Run the **Load E2E Pipeline** instead of treating this as four disconnected notebooks.
 
 - Confirm the pipeline orders the work as Bronze → Silver → Gold, with the mirrored-agent transform
-  included.
+  included and the semantic-model dimensions built last.
 - Use the pipeline parameters to process the intended date/month window.
 - Watch dependency ordering, retries, and failure notifications.
 - Confirm the final semantic-model refresh activity is ready for Challenge 5.
@@ -141,8 +141,8 @@ insight yet.
 - [ ] Mirrored Cosmos conversation data is represented in the medallion flow.
 - [ ] Silver tables are cleansed, deduplicated, and standardized, including FOCUS-normalized cost.
 - [ ] Gold tables are populated: `gold_cost_summary`, `gold_operational_metrics`,
-      `gold_capacity_usage`, `gold_resource_inventory`, `gold_agent_analytics`, `dim_date`, and
-      `dim_resource`.
+  `gold_resource_inventory`, and `gold_agent_analytics`.
+- [ ] `dim_date` and `dim_resource` are populated by `05_semantic_model_dimensions.ipynb`.
 - [ ] The **Load E2E Pipeline** runs green end-to-end with dependency ordering and retries intact.
 - [ ] Your team can show one correlated result joining cost with agent activity or telemetry.
 - [ ] Your team can explain why Bronze, Silver, and Gold are separate layers.

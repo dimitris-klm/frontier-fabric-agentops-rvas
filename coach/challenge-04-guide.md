@@ -38,7 +38,8 @@ pipelines are already imported from [`resources/fabric-control-tower/`](../resou
 | 1 | `01_bronze_ingestion.ipynb` | Bronze | Raw shortcut files become `bronze_*` Delta tables with lineage and quality checks |
 | 2 | `04_cosmos_mirroring_transform.ipynb` | Agent feed | Mirrored conversations/interactions are shaped for agent analytics and late-arriving records |
 | 3 | `02_silver_transformation.ipynb` | Silver | FOCUS cost normalization, 5-minute metrics, parsed logs, flattened metadata |
-| 4 | `03_gold_aggregation.ipynb` | Gold | Aggregated Gold data products for cost, operations, capacity, inventory, and dimensions |
+| 4 | `03_gold_aggregation.ipynb` | Gold | Aggregated Gold data products for cost, operations, and resource inventory |
+| 5 | `05_semantic_model_dimensions.ipynb` | Model prep | Physical `dim_date` and `dim_resource` tables for Direct Lake |
 
 The attendee guide frames the main path as Bronze → Silver → Gold. In the reference assets, the Cosmos
 mirroring transform can run after Bronze and contributes the agent analytics product; coach teams to
@@ -51,7 +52,7 @@ For the checkpoint, require the **Load E2E Pipeline**:
 
 - Pipeline file: [`pipeline_load_e2e.json`](../resources/fabric-control-tower/fabric/pipelines/pipeline_load_e2e.json)
 - Activities: Bronze Ingestion → Silver Transformation → Gold Aggregation, plus Cosmos Mirroring
-  Transform after Bronze.
+  Transform after Bronze, followed by Semantic Model Dimensions after both Gold paths succeed.
 - Parameters: `FromMonth` defaults to `-3`; `ToMonth` defaults to `0`.
 - Policy: notebook activities have retries and dependency conditions.
 
@@ -74,7 +75,6 @@ Match the table list in [`docs/architecture.md`](../docs/architecture.md#the-gol
 - `gold_cost_summary`
 - `gold_operational_metrics`
 - `gold_agent_analytics`
-- `gold_capacity_usage`
 - `gold_resource_inventory` (SCD Type 2)
 - `dim_date`
 - `dim_resource`

@@ -87,6 +87,28 @@
         }
       },
       {
+        "name": "Semantic Model Dimensions",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "Gold Aggregation",
+            "dependencyConditions": ["Succeeded"]
+          },
+          {
+            "activity": "Cosmos Mirroring Transform",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 60
+        },
+        "typeProperties": {
+          "notebookId": "05_semantic_model_dimensions"
+        }
+      },
+      {
         "name": "Send Failure Notification",
         "type": "WebActivity",
         "dependsOn": [
@@ -104,6 +126,10 @@
           },
           {
             "activity": "Cosmos Mirroring Transform",
+            "dependencyConditions": ["Failed"]
+          },
+          {
+            "activity": "Semantic Model Dimensions",
             "dependencyConditions": ["Failed"]
           }
         ],

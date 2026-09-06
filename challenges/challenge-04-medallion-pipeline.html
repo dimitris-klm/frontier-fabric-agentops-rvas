@@ -80,6 +80,13 @@ reliability, and agent activity</strong>.</p>
 Gold</strong> medallion pipeline over the OneLake shortcuts and mirrored Cosmos data from Challenge 3. The
 win is not just populated tables. The win is correlation — proving that Fabric can connect the cost of
 running agents to the services, telemetry, resources, and conversations that created that spend.</p>
+<blockquote>
+<p>⚠️ <strong>Before you run the pipeline.</strong> The <strong>Load E2E Pipeline</strong> ends with a <code>Send Failure Notification</code>
+web activity that POSTs to the <code>WebhookUrl</code> pipeline parameter. Nothing in this repo provisions that
+endpoint — you must supply your own <strong>Logic App</strong> (or any HTTP-triggered webhook) and pass its URL when
+you run the pipeline. Leaving the placeholder default in place means the notification activity itself
+fails whenever an upstream notebook fails.</p>
+</blockquote>
 <h2 id="objectives">Objectives<a class="anchor" href="#objectives" aria-hidden="true">#</a></h2>
 <p>By the end of this challenge you will have:</p>
 <ul>
@@ -177,16 +184,12 @@ listed in the reference architecture:</p>
 <td>Error rates, latency percentiles, and availability by service</td>
 </tr>
 <tr>
-<td><code>gold_capacity_usage</code></td>
-<td>Utilization signals for capacity planning</td>
-</tr>
-<tr>
 <td><code>gold_resource_inventory</code></td>
 <td>SCD Type 2 resource inventory and governance history</td>
 </tr>
 <tr>
 <td><code>gold_agent_analytics</code></td>
-<td>Conversations, tokens, response time, and satisfaction by agent</td>
+<td>Conversations, tokens, and response time by model and topic</td>
 </tr>
 <tr>
 <td><code>dim_date</code>, <code>dim_resource</code></td>
@@ -194,12 +197,13 @@ listed in the reference architecture:</p>
 </tr>
 </tbody></table></div>
 <p>Use <code>03_gold_aggregation.ipynb</code> for the Gold aggregation path, with
-<code>04_cosmos_mirroring_transform.ipynb</code> feeding the agent analytics product.</p>
+<code>04_cosmos_mirroring_transform.ipynb</code> feeding the agent analytics product. After both complete, run
+<code>05_semantic_model_dimensions.ipynb</code> to materialize <code>dim_date</code> and <code>dim_resource</code> for Direct Lake.</p>
 <h3 id="4-orchestrate-the-load">4. Orchestrate the load<a class="anchor" href="#4-orchestrate-the-load" aria-hidden="true">#</a></h3>
 <p>Run the <strong>Load E2E Pipeline</strong> instead of treating this as four disconnected notebooks.</p>
 <ul>
 <li>Confirm the pipeline orders the work as Bronze → Silver → Gold, with the mirrored-agent transform
-included.</li>
+included and the semantic-model dimensions built last.</li>
 <li>Use the pipeline parameters to process the intended date/month window.</li>
 <li>Watch dependency ordering, retries, and failure notifications.</li>
 <li>Confirm the final semantic-model refresh activity is ready for Challenge 5.</li>
@@ -220,8 +224,8 @@ insight yet.</p>
 <li><input disabled="" type="checkbox"> Mirrored Cosmos conversation data is represented in the medallion flow.</li>
 <li><input disabled="" type="checkbox"> Silver tables are cleansed, deduplicated, and standardized, including FOCUS-normalized cost.</li>
 <li><input disabled="" type="checkbox"> Gold tables are populated: <code>gold_cost_summary</code>, <code>gold_operational_metrics</code>,
-<code>gold_capacity_usage</code>, <code>gold_resource_inventory</code>, <code>gold_agent_analytics</code>, <code>dim_date</code>, and
-<code>dim_resource</code>.</li>
+<code>gold_resource_inventory</code>, and <code>gold_agent_analytics</code>.</li>
+<li><input disabled="" type="checkbox"> <code>dim_date</code> and <code>dim_resource</code> are populated by <code>05_semantic_model_dimensions.ipynb</code>.</li>
 <li><input disabled="" type="checkbox"> The <strong>Load E2E Pipeline</strong> runs green end-to-end with dependency ordering and retries intact.</li>
 <li><input disabled="" type="checkbox"> Your team can show one correlated result joining cost with agent activity or telemetry.</li>
 <li><input disabled="" type="checkbox"> Your team can explain why Bronze, Silver, and Gold are separate layers.</li>

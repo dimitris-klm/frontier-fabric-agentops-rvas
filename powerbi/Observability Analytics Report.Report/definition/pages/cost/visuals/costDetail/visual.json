@@ -1,0 +1,119 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "costDetail",
+  "position": {
+    "x": 32,
+    "y": 688,
+    "z": 9,
+    "width": 1856,
+    "height": 344,
+    "tabOrder": 9
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "ResourceInventory"
+                    }
+                  },
+                  "Property": "resource_name"
+                }
+              },
+              "queryRef": "ResourceInventory.resource_name",
+              "nativeQueryRef": "resource_name"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "ResourceInventory"
+                    }
+                  },
+                  "Property": "resource_type"
+                }
+              },
+              "queryRef": "ResourceInventory.resource_type",
+              "nativeQueryRef": "resource_type"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "ResourceInventory"
+                    }
+                  },
+                  "Property": "resource_group"
+                }
+              },
+              "queryRef": "ResourceInventory.resource_group",
+              "nativeQueryRef": "resource_group"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "CostSummary"
+                    }
+                  },
+                  "Property": "TotalCost"
+                }
+              },
+              "queryRef": "CostSummary.TotalCost",
+              "nativeQueryRef": "TotalCost"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Resource cost detail'"
+                }
+              }
+            },
+            "fontSize": {
+              "expr": {
+                "Literal": {
+                  "Value": "13D"
+                }
+              }
+            },
+            "fontColor": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#17212B'"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -56,6 +56,7 @@
           <li><a class="h3" href="#01bronzeingestionipynb">01_bronze_ingestion.ipynb</a></li>
           <li><a class="h3" href="#02silvertransformationipynb">02_silver_transformation.ipynb</a></li>
           <li><a class="h3" href="#03goldaggregationipynb">03_gold_aggregation.ipynb</a></li>
+          <li><a class="h3" href="#05semanticmodeldimensionsipynb">05_semantic_model_dimensions.ipynb</a></li>
           <li><a class="h3" href="#04cosmosmirroringtransformipynb">04_cosmos_mirroring_transform.ipynb</a></li>
           <li><a class="h2" href="#pipeline-schedule">Pipeline Schedule</a></li>
           <li><a class="h2" href="#semantic-model">Semantic Model</a></li>
@@ -109,7 +110,7 @@ tower</strong> itself — the Fabric workspace you stand up across
 │  │  │   ├─ metadata/       (shortcut)  │   └────────────┬───────────────┘  │
 │  │  │   ├─ telemetry/      (shortcuts) │                │                  │
 │  │  │   └─ diagnostics/    (shortcuts) │                │                  │
-│  │  └─ Tables/                         │                │                  │
+│  │  └─ Tables/dbo/                     │                │                  │
 │  │      ├─ bronze_*  (raw Delta)       │◄───────────────┘                  │
 │  │      ├─ silver_*  (cleansed Delta)  │                                   │
 │  │      └─ gold_*    (aggregated Delta)│                                   │
@@ -131,9 +132,9 @@ tower</strong> itself — the Fabric workspace you stand up across
 │                    │                                                        │
 │  ┌─────────────────▼───────────────────┐   ┌────────────────────────────┐  │
 │  │  Semantic Model (Direct Lake)       │──▶│  Power BI Reports          │  │
-│  │  fact_costs, fact_metrics, ...      │   │  Cost Overview             │  │
-│  │  dim_resource, dim_date, ...        │   │  Capacity Utilization      │  │
-│  │  Measures: TotalCost, ErrorRate ... │   │  Operational Health        │  │
+│  │  CostSummary, OperationalMetrics    │   │  Cost Overview             │  │
+│  │  AgentAnalytics + dimensions        │   │  Operational Health        │  │
+│  │  Measures: TotalCost, ErrorRate ... │   │  Performance               │  │
 │  └─────────────────────────────────────┘   │  Agent Performance         │  │
 │                                            │  Resource Inventory        │  │
 │                                            └────────────────────────────┘  │
@@ -204,12 +205,14 @@ python src/setup/setup_fabric_workspace.py \
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python src/setup/setup_cosmos_mirroring.py \
   --workspace-id &quot;&lt;workspace-id&gt;&quot; \
   --cosmos-account &quot;&lt;cosmos-account-name&gt;&quot; \
-  --database &quot;observability&quot;</code></pre>
+  --database &quot;agentsdb&quot; \
+  --connection-id &quot;&lt;fabric-cosmos-connection-id&gt;&quot;</code></pre>
 <p>The script:</p>
 <ol>
-<li>Enables the Cosmos DB account for Fabric Mirroring (continuous backup, analytical store).</li>
-<li>Creates a mirrored database item in the Fabric workspace.</li>
-<li>Configures table selection and replication for the <code>conversations</code>, <code>messages</code>, and <code>feedback</code> containers.</li>
+<li>Resolves the participant-owned <strong>Azure Cosmos DB v2</strong> cloud connection by ID or account endpoint.</li>
+<li>Creates a mirrored database definition for the Cosmos DB database in the Fabric workspace.</li>
+<li>Starts replication and confirms that Mirroring reaches a running state. Verify that the
+<code>conversations</code> and <code>interactions</code> containers from Challenge 1 appear as mirrored tables.</li>
 </ol>
 <h3 id="4-run-notebooks">4. Run Notebooks<a class="anchor" href="#4-run-notebooks" aria-hidden="true">#</a></h3>
 <p>Run the notebooks in order — either manually in Fabric or via the E2E pipeline:</p>
@@ -242,7 +245,7 @@ python src/setup/setup_fabric_workspace.py \
 <p>To trigger all four in sequence, open the <strong>Load E2E Pipeline</strong> in Fabric and click <strong>Run</strong>.</p>
 <h2 id="notebooks">Notebooks<a class="anchor" href="#notebooks" aria-hidden="true">#</a></h2>
 <h3 id="01bronzeingestionipynb">01_bronze_ingestion.ipynb<a class="anchor" href="#01bronzeingestionipynb" aria-hidden="true">#</a></h3>
-<p>Reads raw Parquet files from ADLS Gen2 shortcuts and writes Delta tables into the Lakehouse <code>Tables/</code> section.</p>
+<p>Reads raw Parquet files from ADLS Gen2 shortcuts and writes Delta tables into the schema-enabled Lakehouse <code>Tables/dbo/</code> section.</p>
 <p><strong>Input</strong>: <code>Files/costs/</code>, <code>Files/metadata/</code>, <code>Files/telemetry/apprequests/</code>,
 <code>Files/telemetry/appdependencies/</code>, <code>Files/telemetry/appmetrics/</code>, <code>Files/diagnostics/audit/</code>,
 <code>Files/diagnostics/platformmetrics/</code>
@@ -275,10 +278,6 @@ python src/setup/setup_fabric_workspace.py \
 <td>Daily/monthly cost aggregates by subscription, resource group, service, and tag</td>
 </tr>
 <tr>
-<td><code>gold_capacity_usage</code></td>
-<td>Hourly capacity utilization (CPU, memory, DTU) with percentile bands</td>
-</tr>
-<tr>
 <td><code>gold_operational_metrics</code></td>
 <td>Error rates, latency percentiles (p50/p95/p99), availability per service</td>
 </tr>
@@ -288,15 +287,22 @@ python src/setup/setup_fabric_workspace.py \
 </tr>
 <tr>
 <td><code>gold_agent_analytics</code></td>
-<td>Conversation counts, token usage, response times, satisfaction scores</td>
+<td>Conversation counts, token usage, and response times by model and topic</td>
 </tr>
-<tr>
+</tbody></table></div>
+<h3 id="05semanticmodeldimensionsipynb">05_semantic_model_dimensions.ipynb<a class="anchor" href="#05semanticmodeldimensionsipynb" aria-hidden="true">#</a></h3>
+<p>Creates the physical Direct Lake dimensions after notebooks 03 and 04 have populated the Gold layer.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Table</th>
+<th>Description</th>
+</tr>
+</thead><tbody><tr>
 <td><code>dim_date</code></td>
-<td>Standard date dimension (fiscal calendar, holidays, working days)</td>
+<td>Continuous calendar spanning the dates present in the four Gold data products</td>
 </tr>
 <tr>
 <td><code>dim_resource</code></td>
-<td>Conformed resource dimension with hierarchy (subscription → resource group → resource)</td>
+<td>One current, deduplicated row per resource derived from <code>gold_resource_inventory</code></td>
 </tr>
 </tbody></table></div>
 <h3 id="04cosmosmirroringtransformipynb">04_cosmos_mirroring_transform.ipynb<a class="anchor" href="#04cosmosmirroringtransformipynb" aria-hidden="true">#</a></h3>
@@ -307,7 +313,7 @@ python src/setup/setup_fabric_workspace.py \
 <ul>
 <li>Sessionizes messages into conversation threads.</li>
 <li>Calculates per-conversation metrics: message count, total tokens, elapsed time, resolution status.</li>
-<li>Joins feedback scores and computes rolling satisfaction averages.</li>
+<li>Aggregates conversations, interactions, token usage, and response time by model and topic.</li>
 <li>Handles late-arriving mirrored records with merge-on-read reconciliation.</li>
 </ul>
 <h2 id="pipeline-schedule">Pipeline Schedule<a class="anchor" href="#pipeline-schedule" aria-hidden="true">#</a></h2>
@@ -329,24 +335,18 @@ python src/setup/setup_fabric_workspace.py \
 </tbody></table></div>
 <p>Both pipelines include:</p>
 <ul>
-<li>Dependency ordering: Bronze → Silver → Gold → Semantic Model refresh.</li>
+<li>Dependency ordering: Bronze → Silver → Gold plus mirrored-agent transform → semantic-model dimensions.</li>
 <li>Retry policy: 2 retries with 5-minute backoff.</li>
 <li>Failure notifications via Fabric alerts (email and Teams webhook).</li>
 </ul>
 <h2 id="semantic-model">Semantic Model<a class="anchor" href="#semantic-model" aria-hidden="true">#</a></h2>
 <p>The Direct Lake semantic model connects Power BI directly to Delta tables in OneLake — no import or DirectQuery overhead.</p>
 <h3 id="tables-and-relationships">Tables and Relationships<a class="anchor" href="#tables-and-relationships" aria-hidden="true">#</a></h3>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>dim_date ──────────┐
-                   │ 1:*
-fact_costs ◄───────┤
-                   │ 1:*
-dim_resource ──────┤
-                   │ 1:*
-fact_metrics ◄─────┤
-                   │ 1:*
-fact_operations ◄──┘
-                   
-fact_agent_analytics ──▶ dim_date</code></pre>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>Calendar (dim_date) ──1:*──▶ CostSummary
+                    ├─1:*──▶ OperationalMetrics
+                    └─1:*──▶ AgentAnalytics
+
+ResourceInventory (dim_resource) ──1:*──▶ CostSummary</code></pre>
 <h3 id="key-measures">Key Measures<a class="anchor" href="#key-measures" aria-hidden="true">#</a></h3>
 <div class="table-wrap"><table><thead><tr>
 <th>Measure</th>
@@ -354,35 +354,31 @@ fact_agent_analytics ──▶ dim_date</code></pre>
 </tr>
 </thead><tbody><tr>
 <td>TotalCost</td>
-<td><code>SUM(fact_costs[BilledCost])</code></td>
+<td><code>SUM(CostSummary[monthly_cost])</code></td>
 </tr>
 <tr>
-<td>CostMoM%</td>
+<td>CostMoMChange</td>
 <td>Month-over-month cost change percentage</td>
 </tr>
 <tr>
-<td>CapacityUtilization</td>
-<td><code>AVERAGE(fact_metrics[CPUPercent])</code></td>
-</tr>
-<tr>
 <td>ErrorRate</td>
-<td><code>DIVIDE(COUNTROWS(FILTER(fact_operations, [Severity] = &quot;Error&quot;)), COUNTROWS(fact_operations))</code></td>
+<td><code>DIVIDE(SUM(OperationalMetrics[error_count]), SUM(OperationalMetrics[total_requests]), 0)</code></td>
 </tr>
 <tr>
 <td>P95Latency</td>
-<td><code>PERCENTILE.INC(fact_operations[DurationMs], 0.95)</code></td>
+<td><code>AVERAGE(OperationalMetrics[p95_latency_ms])</code></td>
 </tr>
 <tr>
-<td>AvgSatisfaction</td>
-<td><code>AVERAGE(fact_agent_analytics[SatisfactionScore])</code></td>
+<td>TotalConversations</td>
+<td><code>SUM(AgentAnalytics[total_conversations])</code></td>
 </tr>
 <tr>
-<td>ConversationCount</td>
-<td><code>DISTINCTCOUNT(fact_agent_analytics[ConversationId])</code></td>
+<td>TotalTokens</td>
+<td><code>SUM(AgentAnalytics[total_tokens_used])</code></td>
 </tr>
 </tbody></table></div>
 <h3 id="time-intelligence">Time Intelligence<a class="anchor" href="#time-intelligence" aria-hidden="true">#</a></h3>
-<p>All cost and metric measures include time-intelligence variants: YTD, MTD, QTD, prior period, and rolling 30-day averages. These are generated via a calculation group applied to <code>dim_date</code>.</p>
+<p>The model includes YTD and prior-month cost measures using the physical <code>dim_date</code> table.</p>
 <h2 id="power-bi-report">Power BI Report<a class="anchor" href="#power-bi-report" aria-hidden="true">#</a></h2>
 <h3 id="connecting-to-the-semantic-model">Connecting to the Semantic Model<a class="anchor" href="#connecting-to-the-semantic-model" aria-hidden="true">#</a></h3>
 <ol>
@@ -400,16 +396,12 @@ fact_agent_analytics ──▶ dim_date</code></pre>
 <td>KPI cards (total cost, MoM trend), cost-by-service bar chart, daily cost line chart with forecast, top-10 cost drivers table</td>
 </tr>
 <tr>
-<td><strong>Capacity Utilization</strong></td>
-<td>Gauge charts per capacity metric, heatmap by resource and hour, utilization trend with threshold lines</td>
-</tr>
-<tr>
 <td><strong>Operational Health</strong></td>
 <td>Error-rate trend, P95 latency sparklines, availability scorecards, log-severity breakdown donut chart</td>
 </tr>
 <tr>
 <td><strong>Agent Performance</strong></td>
-<td>Conversation volume over time, avg response time, token consumption bar chart, satisfaction trend, resolution rate funnel</td>
+<td>Conversation, interaction, and session volume; response time; token consumption by model and topic</td>
 </tr>
 <tr>
 <td><strong>Resource Inventory</strong></td>
@@ -449,7 +441,8 @@ fact_agent_analytics ──▶ dim_date</code></pre>
 │   │   ├── 01_bronze_ingestion.ipynb
 │   │   ├── 02_silver_transformation.ipynb
 │   │   ├── 03_gold_aggregation.ipynb
-│   │   └── 04_cosmos_mirroring_transform.ipynb
+│   │   ├── 04_cosmos_mirroring_transform.ipynb
+│   │   └── 05_semantic_model_dimensions.ipynb
 │   └── pipelines/
 │       ├── pipeline_load_e2e.json
 │       └── pipeline_daily_refresh.json
@@ -476,7 +469,7 @@ fact_agent_analytics ──▶ dim_date</code></pre>
         </article>
         
         <div class="filetree">
-          <div class="filetree-head">📁 fabric-control-tower — 15 files · click any file to view it here (syntax-highlighted)</div>
+          <div class="filetree-head">📁 fabric-control-tower — 16 files · click any file to view it here (syntax-highlighted)</div>
           <ul>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2F.github%2Fworkflows%2Fdeploy.yml"><span class="ic">›</span>fabric-control-tower/.github/workflows/deploy.yml</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2F.gitignore"><span class="ic">›</span>fabric-control-tower/.gitignore</a></li>
@@ -485,6 +478,7 @@ fact_agent_analytics ──▶ dim_date</code></pre>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fnotebooks%2F02_silver_transformation.ipynb"><span class="ic">›</span>fabric-control-tower/fabric/notebooks/02_silver_transformation.ipynb</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fnotebooks%2F03_gold_aggregation.ipynb"><span class="ic">›</span>fabric-control-tower/fabric/notebooks/03_gold_aggregation.ipynb</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fnotebooks%2F04_cosmos_mirroring_transform.ipynb"><span class="ic">›</span>fabric-control-tower/fabric/notebooks/04_cosmos_mirroring_transform.ipynb</a></li>
+            <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fnotebooks%2F05_semantic_model_dimensions.ipynb"><span class="ic">›</span>fabric-control-tower/fabric/notebooks/05_semantic_model_dimensions.ipynb</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fpipelines%2Fpipeline_daily_refresh.json"><span class="ic">›</span>fabric-control-tower/fabric/pipelines/pipeline_daily_refresh.json</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fpipelines%2Fpipeline_load_e2e.json"><span class="ic">›</span>fabric-control-tower/fabric/pipelines/pipeline_load_e2e.json</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Finfra%2Fmain.bicep"><span class="ic">›</span>fabric-control-tower/infra/main.bicep</a></li>
