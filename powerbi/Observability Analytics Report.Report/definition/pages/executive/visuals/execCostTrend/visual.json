@@ -3,10 +3,10 @@
   "name": "execCostTrend",
   "position": {
     "x": 32,
-    "y": 416,
+    "y": 424,
     "z": 9,
     "width": 916,
-    "height": 300,
+    "height": 292,
     "tabOrder": 9
   },
   "visual": {

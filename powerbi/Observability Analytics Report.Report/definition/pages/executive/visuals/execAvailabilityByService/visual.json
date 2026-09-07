@@ -3,10 +3,10 @@
   "name": "execAvailabilityByService",
   "position": {
     "x": 658,
-    "y": 748,
+    "y": 740,
     "z": 12,
     "width": 602,
-    "height": 300,
+    "height": 308,
     "tabOrder": 12
   },
   "visual": {

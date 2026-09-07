@@ -161,9 +161,13 @@ function page(name, displayName) {
 }
 
 // --- Shared layout bands (1920x1080 canvas, 32px margin, 24px gutter) ---
-const SLICER_A = pos(1160, 128, 352, 76, 1);
-const SLICER_B = pos(1536, 128, 352, 76, 2);
-const LABEL = pos(32, 128, 1100, 76, 3);
+// Rows: header 0-104 | slicers 128-224 | KPI 248-400 | charts 424-716 | charts 740-1048
+const SLICER_A = pos(1160, 128, 352, 96, 1);
+const SLICER_B = pos(1536, 128, 352, 96, 2);
+const LABEL = pos(32, 128, 1100, 96, 3);
+const kpi = (x, width, z) => pos(x, 248, width, 152, z);
+const rowA = (x, width, z) => pos(x, 424, width, 292, z);
+const rowB = (x, width, z) => pos(x, 740, width, 308, z);
 const DATE = column('Calendar', 'Date');
 
 fs.rmSync(ROOT, { recursive: true, force: true });
@@ -256,6 +260,7 @@ writeJson(path.join(ROOT, 'StaticResources', 'RegisteredResources', `${THEME}.js
         background: panel,
         border: [{ show: true, color: { solid: { color: C.neutral } } }],
         visualHeader: [{ show: false }],
+        outline: [{ show: false }],
       },
     },
     tableEx: {
@@ -273,6 +278,8 @@ writeJson(path.join(ROOT, 'StaticResources', 'RegisteredResources', `${THEME}.js
         background: panel,
         border: panelBorder,
         visualHeader: [{ show: false }],
+        // The container title already names the slicer; its own header would repeat the field name.
+        header: [{ show: false }],
         items: [{ fontColor: { solid: { color: C.charcoal } }, textSize: 9 }],
       },
     },
@@ -291,21 +298,21 @@ header('executive', 'execHeader', 'Executive Overview', 'Spend, reliability and 
 sectionLabel('executive', 'execLabel', LABEL, 'ESTATE HEALTH');
 slicer('executive', 'execSlicerDate', SLICER_A, DATE, 'Between', 'Date range');
 slicer('executive', 'execSlicerService', SLICER_B, column('OperationalMetrics', 'service_name'), 'Dropdown', 'Service');
-card('executive', 'execCardTotalCost', pos(32, 228, 352, 164, 4), measure('CostSummary', 'TotalCost'), 'Total cost', C.primary);
-card('executive', 'execCardCostMoM', pos(408, 228, 352, 164, 5), measure('CostSummary', 'CostMoMChange'), 'Cost MoM change', C.msblue);
-card('executive', 'execCardAvailability', pos(784, 228, 352, 164, 6), measure('OperationalMetrics', 'Availability'), 'Availability', C.teal);
-card('executive', 'execCardErrorRate', pos(1160, 228, 352, 164, 7), measure('OperationalMetrics', 'ErrorRate'), 'Error rate', C.red);
-card('executive', 'execCardConversations', pos(1536, 228, 352, 164, 8), measure('AgentAnalytics', 'TotalConversations'), 'Conversations', C.purple);
-chart('executive', 'execCostTrend', pos(32, 416, 916, 300, 9), 'lineChart', DATE,
+card('executive', 'execCardTotalCost', kpi(32, 352, 4), measure('CostSummary', 'TotalCost'), 'Total cost', C.primary);
+card('executive', 'execCardCostMoM', kpi(408, 352, 5), measure('CostSummary', 'CostMoMChange'), 'Cost MoM change', C.msblue);
+card('executive', 'execCardAvailability', kpi(784, 352, 6), measure('OperationalMetrics', 'Availability'), 'Availability', C.teal);
+card('executive', 'execCardErrorRate', kpi(1160, 352, 7), measure('OperationalMetrics', 'ErrorRate'), 'Error rate', C.red);
+card('executive', 'execCardConversations', kpi(1536, 352, 8), measure('AgentAnalytics', 'TotalConversations'), 'Conversations', C.purple);
+chart('executive', 'execCostTrend', rowA(32, 916, 9), 'lineChart', DATE,
   [measure('CostSummary', 'TotalCost')], 'Spend over time');
-chart('executive', 'execReliabilityTrend', pos(972, 416, 916, 300, 10), 'lineChart', DATE,
+chart('executive', 'execReliabilityTrend', rowA(972, 916, 10), 'lineChart', DATE,
   [measure('OperationalMetrics', 'ErrorRate'), measure('OperationalMetrics', 'P95Latency')],
   'Error rate and P95 latency over time');
-chart('executive', 'execCostByService', pos(32, 748, 602, 300, 11), 'clusteredBarChart',
+chart('executive', 'execCostByService', rowB(32, 602, 11), 'clusteredBarChart',
   column('CostSummary', 'service_name'), [measure('CostSummary', 'TotalCost')], 'Spend by service');
-chart('executive', 'execAvailabilityByService', pos(658, 748, 602, 300, 12), 'clusteredColumnChart',
+chart('executive', 'execAvailabilityByService', rowB(658, 602, 12), 'clusteredColumnChart',
   column('OperationalMetrics', 'service_name'), [measure('OperationalMetrics', 'Availability')], 'Availability by service');
-chart('executive', 'execConversationsByModel', pos(1284, 748, 602, 300, 13), 'clusteredBarChart',
+chart('executive', 'execConversationsByModel', rowB(1284, 602, 13), 'clusteredBarChart',
   column('AgentAnalytics', 'model_name'), [measure('AgentAnalytics', 'TotalConversations')], 'Conversations by model');
 
 // --- Page 2: Reliability ---
@@ -314,16 +321,16 @@ header('reliability', 'relHeader', 'Reliability', 'Error rate, latency and avail
 sectionLabel('reliability', 'relLabel', LABEL, 'SERVICE HEALTH');
 slicer('reliability', 'relSlicerDate', SLICER_A, DATE, 'Between', 'Date range');
 slicer('reliability', 'relSlicerService', SLICER_B, column('OperationalMetrics', 'service_name'), 'Dropdown', 'Service');
-card('reliability', 'relCardErrorRate', pos(32, 228, 602, 164, 4), measure('OperationalMetrics', 'ErrorRate'), 'Error rate', C.red);
-card('reliability', 'relCardP95Latency', pos(658, 228, 602, 164, 5), measure('OperationalMetrics', 'P95Latency'), 'P95 latency', C.amber);
-card('reliability', 'relCardAvailability', pos(1284, 228, 602, 164, 6), measure('OperationalMetrics', 'Availability'), 'Availability', C.teal);
-chart('reliability', 'relTrend', pos(32, 416, 1160, 300, 7), 'lineChart', DATE,
+card('reliability', 'relCardErrorRate', kpi(32, 602, 4), measure('OperationalMetrics', 'ErrorRate'), 'Error rate', C.red);
+card('reliability', 'relCardP95Latency', kpi(658, 602, 5), measure('OperationalMetrics', 'P95Latency'), 'P95 latency', C.amber);
+card('reliability', 'relCardAvailability', kpi(1284, 602, 6), measure('OperationalMetrics', 'Availability'), 'Availability', C.teal);
+chart('reliability', 'relTrend', rowA(32, 1160, 7), 'lineChart', DATE,
   [measure('OperationalMetrics', 'ErrorRate'), measure('OperationalMetrics', 'P95Latency')],
   'Error rate and P95 latency over time');
-chart('reliability', 'relByService', pos(1216, 416, 672, 300, 8), 'clusteredColumnChart',
+chart('reliability', 'relByService', rowA(1216, 672, 8), 'clusteredColumnChart',
   column('OperationalMetrics', 'service_name'), [measure('OperationalMetrics', 'ErrorRate')],
   'Error rate by service');
-table('reliability', 'relDetail', pos(32, 748, 1856, 300, 9), [
+table('reliability', 'relDetail', rowB(32, 1856, 9), [
   column('OperationalMetrics', 'service_name'),
   measure('OperationalMetrics', 'ErrorRate'),
   measure('OperationalMetrics', 'P95Latency'),
@@ -336,15 +343,15 @@ header('cost', 'costHeader', 'Cost', 'Where spend lands, how it trends and which
 sectionLabel('cost', 'costLabel', LABEL, 'SPEND POSITION');
 slicer('cost', 'costSlicerDate', SLICER_A, DATE, 'Between', 'Date range');
 slicer('cost', 'costSlicerResource', SLICER_B, column('ResourceInventory', 'resource_name'), 'Dropdown', 'Resource');
-card('cost', 'costCardTotalCost', pos(32, 228, 446, 164, 4), measure('CostSummary', 'TotalCost'), 'Total cost', C.primary);
-card('cost', 'costCardCostYTD', pos(502, 228, 446, 164, 5), measure('CostSummary', 'CostYTD'), 'Cost YTD', C.msblue);
-card('cost', 'costCardAvgMonthlyCost', pos(972, 228, 446, 164, 6), measure('CostSummary', 'AvgMonthlyCost'), 'Average monthly cost', C.teal);
-card('cost', 'costCardCostMoMChange', pos(1442, 228, 446, 164, 7), measure('CostSummary', 'CostMoMChange'), 'Cost MoM change', C.amber);
-chart('cost', 'costTrend', pos(32, 416, 916, 300, 8), 'lineChart', DATE,
+card('cost', 'costCardTotalCost', kpi(32, 446, 4), measure('CostSummary', 'TotalCost'), 'Total cost', C.primary);
+card('cost', 'costCardCostYTD', kpi(502, 446, 5), measure('CostSummary', 'CostYTD'), 'Cost YTD', C.msblue);
+card('cost', 'costCardAvgMonthlyCost', kpi(972, 446, 6), measure('CostSummary', 'AvgMonthlyCost'), 'Average monthly cost', C.teal);
+card('cost', 'costCardCostMoMChange', kpi(1442, 446, 7), measure('CostSummary', 'CostMoMChange'), 'Cost MoM change', C.amber);
+chart('cost', 'costTrend', rowA(32, 916, 8), 'lineChart', DATE,
   [measure('CostSummary', 'TotalCost')], 'Total cost over time');
-chart('cost', 'costByResource', pos(972, 416, 916, 300, 9), 'clusteredBarChart',
+chart('cost', 'costByResource', rowA(972, 916, 9), 'clusteredBarChart',
   column('ResourceInventory', 'resource_name'), [measure('CostSummary', 'TotalCost')], 'Total cost by resource');
-table('cost', 'costDetail', pos(32, 748, 1856, 300, 10), [
+table('cost', 'costDetail', rowB(32, 1856, 10), [
   column('ResourceInventory', 'resource_name'),
   column('ResourceInventory', 'resource_type'),
   column('ResourceInventory', 'resource_group'),
@@ -357,18 +364,18 @@ header('performance', 'perfHeader', 'Performance', 'Agent conversations, respons
 sectionLabel('performance', 'perfLabel', LABEL, 'AGENT WORKLOAD');
 slicer('performance', 'perfSlicerDate', SLICER_A, DATE, 'Between', 'Date range');
 slicer('performance', 'perfSlicerModel', SLICER_B, column('AgentAnalytics', 'model_name'), 'Dropdown', 'Model');
-card('performance', 'perfCardConversations', pos(32, 228, 602, 164, 4), measure('AgentAnalytics', 'TotalConversations'), 'Total conversations', C.purple);
-card('performance', 'perfCardResponseTime', pos(658, 228, 602, 164, 5), measure('AgentAnalytics', 'AvgResponseTime'), 'Average response time', C.amber);
-card('performance', 'perfCardTokens', pos(1284, 228, 602, 164, 6), measure('AgentAnalytics', 'TotalTokens'), 'Total tokens', C.primary);
-chart('performance', 'perfTrend', pos(32, 416, 916, 300, 7), 'lineChart', DATE, [
+card('performance', 'perfCardConversations', kpi(32, 602, 4), measure('AgentAnalytics', 'TotalConversations'), 'Total conversations', C.purple);
+card('performance', 'perfCardResponseTime', kpi(658, 602, 5), measure('AgentAnalytics', 'AvgResponseTime'), 'Average response time', C.amber);
+card('performance', 'perfCardTokens', kpi(1284, 602, 6), measure('AgentAnalytics', 'TotalTokens'), 'Total tokens', C.primary);
+chart('performance', 'perfTrend', rowA(32, 916, 7), 'lineChart', DATE, [
   measure('AgentAnalytics', 'TotalConversations'),
   measure('AgentAnalytics', 'AvgResponseTime'),
   measure('AgentAnalytics', 'TotalTokens'),
 ], 'Agent workload trend');
-chart('performance', 'perfByModel', pos(972, 416, 916, 300, 8), 'clusteredBarChart',
+chart('performance', 'perfByModel', rowA(972, 916, 8), 'clusteredBarChart',
   column('AgentAnalytics', 'model_name'), [measure('AgentAnalytics', 'TotalConversations')],
   'Conversations by model');
-table('performance', 'perfDetail', pos(32, 748, 1856, 300, 9), [
+table('performance', 'perfDetail', rowB(32, 1856, 9), [
   column('AgentAnalytics', 'model_name'),
   column('AgentAnalytics', 'topic_classification'),
   measure('AgentAnalytics', 'TotalConversations'),

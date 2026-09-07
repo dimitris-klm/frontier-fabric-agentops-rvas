@@ -3,10 +3,10 @@
   "name": "perfDetail",
   "position": {
     "x": 32,
-    "y": 748,
+    "y": 740,
     "z": 9,
     "width": 1856,
-    "height": 300,
+    "height": 308,
     "tabOrder": 9
   },
   "visual": {

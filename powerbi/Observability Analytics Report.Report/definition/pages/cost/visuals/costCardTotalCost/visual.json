@@ -3,10 +3,10 @@
   "name": "costCardTotalCost",
   "position": {
     "x": 32,
-    "y": 228,
+    "y": 248,
     "z": 4,
     "width": 446,
-    "height": 164,
+    "height": 152,
     "tabOrder": 4
   },
   "visual": {

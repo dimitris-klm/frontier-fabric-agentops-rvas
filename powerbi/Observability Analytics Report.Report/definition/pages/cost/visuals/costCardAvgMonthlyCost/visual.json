@@ -3,10 +3,10 @@
   "name": "costCardAvgMonthlyCost",
   "position": {
     "x": 972,
-    "y": 228,
+    "y": 248,
     "z": 6,
     "width": 446,
-    "height": 164,
+    "height": 152,
     "tabOrder": 6
   },
   "visual": {

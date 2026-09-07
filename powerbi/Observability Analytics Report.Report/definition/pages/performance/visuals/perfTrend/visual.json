@@ -3,10 +3,10 @@
   "name": "perfTrend",
   "position": {
     "x": 32,
-    "y": 416,
+    "y": 424,
     "z": 7,
     "width": 916,
-    "height": 300,
+    "height": 292,
     "tabOrder": 7
   },
   "visual": {

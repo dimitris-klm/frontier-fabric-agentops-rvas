@@ -3,10 +3,10 @@
   "name": "relCardAvailability",
   "position": {
     "x": 1284,
-    "y": 228,
+    "y": 248,
     "z": 6,
     "width": 602,
-    "height": 164,
+    "height": 152,
     "tabOrder": 6
   },
   "visual": {

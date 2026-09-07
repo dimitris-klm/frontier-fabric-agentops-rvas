@@ -3,10 +3,10 @@
   "name": "execCardErrorRate",
   "position": {
     "x": 1160,
-    "y": 228,
+    "y": 248,
     "z": 7,
     "width": 352,
-    "height": 164,
+    "height": 152,
     "tabOrder": 7
   },
   "visual": {

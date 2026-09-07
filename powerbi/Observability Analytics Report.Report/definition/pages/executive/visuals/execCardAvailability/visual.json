@@ -3,10 +3,10 @@
   "name": "execCardAvailability",
   "position": {
     "x": 784,
-    "y": 228,
+    "y": 248,
     "z": 6,
     "width": 352,
-    "height": 164,
+    "height": 152,
     "tabOrder": 6
   },
   "visual": {

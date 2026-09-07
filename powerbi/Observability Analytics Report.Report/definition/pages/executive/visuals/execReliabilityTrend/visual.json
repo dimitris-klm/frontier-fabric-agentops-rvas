@@ -3,10 +3,10 @@
   "name": "execReliabilityTrend",
   "position": {
     "x": 972,
-    "y": 416,
+    "y": 424,
     "z": 10,
     "width": 916,
-    "height": 300,
+    "height": 292,
     "tabOrder": 10
   },
   "visual": {
