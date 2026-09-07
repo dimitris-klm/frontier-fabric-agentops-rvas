@@ -178,11 +178,11 @@ WITH current_resources AS (
   FROM gold_resource_inventory
   WHERE is_current = true
 ), agent_usage AS (
-  SELECT model_name, interaction_date, total_tokens, conversation_count, avg_response_time_ms
+  SELECT agent_id, interaction_date, total_tokens, conversation_count, avg_response_time_ms
   FROM gold_agent_analytics
 )
 SELECT
-  a.model_name,
+  a.agent_id AS agent_namespace,
   c.cost_year,
   c.cost_month,
   c.service_name,
@@ -194,8 +194,8 @@ FROM gold_cost_summary c
 JOIN current_resources r
   ON c.region = r.region
 JOIN agent_usage a
-  ON r.tags LIKE CONCAT('%', a.model_name, '%')
-GROUP BY a.model_name, c.cost_year, c.cost_month, c.service_name
+  ON r.tags LIKE CONCAT('%', a.agent_id, '%')
+GROUP BY a.agent_id, c.cost_year, c.cost_month, c.service_name
 ORDER BY monthly_cost DESC;
 ```
 </details>

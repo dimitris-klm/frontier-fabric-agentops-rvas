@@ -180,18 +180,18 @@ upstream notebook failure and muddies the diagnosis.</p>
 checkpoint.</p>
 <h2 id="sample-correlation-query">Sample correlation query<a class="anchor" href="#sample-correlation-query" aria-hidden="true">#</a></h2>
 <p>Use this as a coaching pattern, not a hard contract. Teams may need to adapt the tag expression to how
-their <code>metadata</code> export represents tags. <code>gold_agent_analytics</code> identifies the agent by <code>model_name</code>,
-so the tag predicate has to match on whatever identifier their Challenge 2 tags actually carry.</p>
+their <code>metadata</code> export represents tags. The agent namespace should follow the architecture pattern:
+<code>&lt;organization&gt;.&lt;domain&gt;.&lt;agent-name&gt;.&lt;version&gt;</code>.</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-sql">WITH current_resources AS (
   SELECT resource_id, resource_group, region, tags
   FROM gold_resource_inventory
   WHERE is_current = true
 ), agent_usage AS (
-  SELECT model_name, interaction_date, total_tokens, conversation_count, avg_response_time_ms
+  SELECT agent_id, interaction_date, total_tokens, conversation_count, avg_response_time_ms
   FROM gold_agent_analytics
 )
 SELECT
-  a.model_name,
+  a.agent_id AS agent_namespace,
   c.cost_year,
   c.cost_month,
   c.service_name,
@@ -203,8 +203,8 @@ FROM gold_cost_summary c
 JOIN current_resources r
   ON c.region = r.region
 JOIN agent_usage a
-  ON r.tags LIKE CONCAT(&#39;%&#39;, a.model_name, &#39;%&#39;)
-GROUP BY a.model_name, c.cost_year, c.cost_month, c.service_name
+  ON r.tags LIKE CONCAT(&#39;%&#39;, a.agent_id, &#39;%&#39;)
+GROUP BY a.agent_id, c.cost_year, c.cost_month, c.service_name
 ORDER BY monthly_cost DESC;</code></pre>
 <p>A second acceptable proof is operational: join <code>gold_operational_metrics</code> and <code>gold_cost_summary</code> by
 service/time to show error rate or P95 latency beside cost.</p>

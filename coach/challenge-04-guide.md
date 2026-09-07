@@ -85,8 +85,8 @@ checkpoint.
 ## Sample correlation query
 
 Use this as a coaching pattern, not a hard contract. Teams may need to adapt the tag expression to how
-their `metadata` export represents tags. `gold_agent_analytics` identifies the agent by `model_name`,
-so the tag predicate has to match on whatever identifier their Challenge 2 tags actually carry.
+their `metadata` export represents tags. The agent namespace should follow the architecture pattern:
+`<organization>.<domain>.<agent-name>.<version>`.
 
 ```sql
 WITH current_resources AS (
@@ -94,11 +94,11 @@ WITH current_resources AS (
   FROM gold_resource_inventory
   WHERE is_current = true
 ), agent_usage AS (
-  SELECT model_name, interaction_date, total_tokens, conversation_count, avg_response_time_ms
+  SELECT agent_id, interaction_date, total_tokens, conversation_count, avg_response_time_ms
   FROM gold_agent_analytics
 )
 SELECT
-  a.model_name,
+  a.agent_id AS agent_namespace,
   c.cost_year,
   c.cost_month,
   c.service_name,
@@ -110,8 +110,8 @@ FROM gold_cost_summary c
 JOIN current_resources r
   ON c.region = r.region
 JOIN agent_usage a
-  ON r.tags LIKE CONCAT('%', a.model_name, '%')
-GROUP BY a.model_name, c.cost_year, c.cost_month, c.service_name
+  ON r.tags LIKE CONCAT('%', a.agent_id, '%')
+GROUP BY a.agent_id, c.cost_year, c.cost_month, c.service_name
 ORDER BY monthly_cost DESC;
 ```
 
