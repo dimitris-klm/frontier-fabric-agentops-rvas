@@ -4,7 +4,8 @@
   "private": true,
   "description": "Static site generator for the Frontier Fabric AgentOps RVAS GitHub Pages site — renders all Markdown content into branded HTML pages so visitors never leave Pages.",
   "scripts": {
-    "build": "node tools/build.js"
+    "build": "node tools/build.js",
+    "build:report": "node tools/build-report.js"
   },
   "devDependencies": {
     "@microsoft/powerbi-desktop-bridge-cli": "0.1.2",

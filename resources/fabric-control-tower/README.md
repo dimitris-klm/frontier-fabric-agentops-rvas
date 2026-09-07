@@ -263,26 +263,34 @@ The model includes YTD and prior-month cost measures using the physical `dim_dat
 
 ## Power BI Report
 
-### Connecting to the Semantic Model
+A ready-to-import report definition lives in [`powerbi/Observability Analytics Report.Report`](../../powerbi/Observability%20Analytics%20Report.Report) in PBIR format. It is generated from [`tools/build-report.js`](../../tools/build-report.js) — edit the generator, not the JSON, then run `npm run build:report` from the repository root.
 
-1. Open Power BI Desktop or the Power BI service.
-2. Select **OneLake data hub** → choose the semantic model published from this workspace.
-3. The connection uses **Direct Lake** mode — no data copy is created.
+### Importing the Report
 
-### Suggested Report Pages
+Deploy it into the workspace created above. The script resolves the semantic model by name and rewrites the dataset binding, so the definition in source control carries no environment-specific GUID:
+
+```bash
+python src/setup/deploy_report.py \
+  --workspace-name "Observability-Analytics" \
+  --semantic-model-name "Observability Analytics"
+```
+
+The script creates the report if it does not exist and updates the definition in place if it does. Run it only after the semantic model has been published and the Gold tables are populated.
+
+### Report Pages
 
 | Page | Key Visuals |
 |---|---|
-| **Cost Overview** | KPI cards (total cost, MoM trend), cost-by-service bar chart, daily cost line chart with forecast, top-10 cost drivers table |
-| **Operational Health** | Error-rate trend, P95 latency sparklines, availability scorecards, log-severity breakdown donut chart |
-| **Agent Performance** | Conversation, interaction, and session volume; response time; token consumption by model and topic |
-| **Resource Inventory** | Resource count by type/region matrix, change timeline (SCD events), tag compliance percentage, orphaned resource list |
+| **Executive Overview** | Total cost, MoM change, availability, error rate, and conversation KPI cards; spend and reliability trends; spend, availability, and conversations broken out by service and model |
+| **Reliability** | Error rate, P95 latency, and availability cards; combined error-rate and latency trend; error rate by service; per-service detail table |
+| **Cost** | Total, YTD, average monthly, and MoM cost cards; cost trend; cost by resource; resource-level detail table |
+| **Performance** | Conversation, response time, and token cards; agent workload trend; conversations by model; model and topic detail table |
 
 ### Design Guidelines
 
-- Use the organization's brand palette for consistent theming.
+- The report ships with the `ObservabilityControlTower` theme, which applies the RVAP brand palette to data colors, text classes, and visual styling.
 - Apply row-level security (RLS) roles mapped to subscription or resource-group ownership.
-- Enable paginated export for the Resource Inventory page.
+- Connect additional reports through **OneLake data hub** → the published semantic model, which uses **Direct Lake** mode so no data copy is created.
 
 ## Integration with Other Components
 
@@ -316,7 +324,8 @@ fabric-control-tower/
 │       ├── requirements.txt
 │       ├── semantic_model.json     # Direct Lake semantic model definition
 │       ├── setup_fabric_workspace.py
-│       └── setup_cosmos_mirroring.py
+│       ├── setup_cosmos_mirroring.py
+│       └── deploy_report.py        # Imports the PBIR report and binds the model
 ├── .gitignore
 ├── azure.yaml                      # azd manifest
 └── README.md

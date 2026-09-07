@@ -1,9 +1,10 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/pagesMetadata/1.0.0/schema.json",
   "pageOrder": [
+    "executive",
     "reliability",
     "cost",
     "performance"
   ],
-  "activePageName": "reliability"
+  "activePageName": "executive"
 }

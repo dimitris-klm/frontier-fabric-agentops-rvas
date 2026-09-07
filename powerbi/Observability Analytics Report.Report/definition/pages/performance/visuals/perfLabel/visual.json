@@ -1,13 +1,13 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
-  "name": "perfTitle",
+  "name": "perfLabel",
   "position": {
     "x": 32,
-    "y": 24,
-    "z": 0,
-    "width": 1056,
-    "height": 88,
-    "tabOrder": 0
+    "y": 128,
+    "z": 3,
+    "width": 1100,
+    "height": 76,
+    "tabOrder": 3
   },
   "visual": {
     "visualType": "textbox",
@@ -20,12 +20,12 @@
                 "horizontalTextAlignment": "left",
                 "textRuns": [
                   {
-                    "value": "Performance",
+                    "value": "AGENT WORKLOAD",
                     "textStyle": {
-                      "fontFamily": "Segoe UI",
-                      "fontSize": "24pt",
+                      "fontFamily": "Segoe UI Semibold",
+                      "fontSize": "12pt",
                       "fontWeight": "bold",
-                      "color": "#17212B"
+                      "color": "#6B7280"
                     }
                   }
                 ]

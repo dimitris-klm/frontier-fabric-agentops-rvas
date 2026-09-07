@@ -64,8 +64,8 @@
           <li><a class="h3" href="#key-measures">Key Measures</a></li>
           <li><a class="h3" href="#time-intelligence">Time Intelligence</a></li>
           <li><a class="h2" href="#power-bi-report">Power BI Report</a></li>
-          <li><a class="h3" href="#connecting-to-the-semantic-model">Connecting to the Semantic Model</a></li>
-          <li><a class="h3" href="#suggested-report-pages">Suggested Report Pages</a></li>
+          <li><a class="h3" href="#importing-the-report">Importing the Report</a></li>
+          <li><a class="h3" href="#report-pages">Report Pages</a></li>
           <li><a class="h3" href="#design-guidelines">Design Guidelines</a></li>
           <li><a class="h2" href="#integration-with-other-components">Integration with Other Components</a></li>
           <li><a class="h2" href="#project-structure">Project Structure</a></li>
@@ -380,39 +380,40 @@ ResourceInventory (dim_resource) ──1:*──▶ CostSummary</code></pre>
 <h3 id="time-intelligence">Time Intelligence<a class="anchor" href="#time-intelligence" aria-hidden="true">#</a></h3>
 <p>The model includes YTD and prior-month cost measures using the physical <code>dim_date</code> table.</p>
 <h2 id="power-bi-report">Power BI Report<a class="anchor" href="#power-bi-report" aria-hidden="true">#</a></h2>
-<h3 id="connecting-to-the-semantic-model">Connecting to the Semantic Model<a class="anchor" href="#connecting-to-the-semantic-model" aria-hidden="true">#</a></h3>
-<ol>
-<li>Open Power BI Desktop or the Power BI service.</li>
-<li>Select <strong>OneLake data hub</strong> → choose the semantic model published from this workspace.</li>
-<li>The connection uses <strong>Direct Lake</strong> mode — no data copy is created.</li>
-</ol>
-<h3 id="suggested-report-pages">Suggested Report Pages<a class="anchor" href="#suggested-report-pages" aria-hidden="true">#</a></h3>
+<p>A ready-to-import report definition lives in <a href="../../code.html?path=powerbi%2FObservability%2520Analytics%2520Report.Report"><code>powerbi/Observability Analytics Report.Report</code></a> in PBIR format. It is generated from <a href="../../code.html?path=tools%2Fbuild-report.js"><code>tools/build-report.js</code></a> — edit the generator, not the JSON, then run <code>npm run build:report</code> from the repository root.</p>
+<h3 id="importing-the-report">Importing the Report<a class="anchor" href="#importing-the-report" aria-hidden="true">#</a></h3>
+<p>Deploy it into the workspace created above. The script resolves the semantic model by name and rewrites the dataset binding, so the definition in source control carries no environment-specific GUID:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">python src/setup/deploy_report.py \
+  --workspace-name &quot;Observability-Analytics&quot; \
+  --semantic-model-name &quot;Observability Analytics&quot;</code></pre>
+<p>The script creates the report if it does not exist and updates the definition in place if it does. Run it only after the semantic model has been published and the Gold tables are populated.</p>
+<h3 id="report-pages">Report Pages<a class="anchor" href="#report-pages" aria-hidden="true">#</a></h3>
 <div class="table-wrap"><table><thead><tr>
 <th>Page</th>
 <th>Key Visuals</th>
 </tr>
 </thead><tbody><tr>
-<td><strong>Cost Overview</strong></td>
-<td>KPI cards (total cost, MoM trend), cost-by-service bar chart, daily cost line chart with forecast, top-10 cost drivers table</td>
+<td><strong>Executive Overview</strong></td>
+<td>Total cost, MoM change, availability, error rate, and conversation KPI cards; spend and reliability trends; spend, availability, and conversations broken out by service and model</td>
 </tr>
 <tr>
-<td><strong>Operational Health</strong></td>
-<td>Error-rate trend, P95 latency sparklines, availability scorecards, log-severity breakdown donut chart</td>
+<td><strong>Reliability</strong></td>
+<td>Error rate, P95 latency, and availability cards; combined error-rate and latency trend; error rate by service; per-service detail table</td>
 </tr>
 <tr>
-<td><strong>Agent Performance</strong></td>
-<td>Conversation, interaction, and session volume; response time; token consumption by model and topic</td>
+<td><strong>Cost</strong></td>
+<td>Total, YTD, average monthly, and MoM cost cards; cost trend; cost by resource; resource-level detail table</td>
 </tr>
 <tr>
-<td><strong>Resource Inventory</strong></td>
-<td>Resource count by type/region matrix, change timeline (SCD events), tag compliance percentage, orphaned resource list</td>
+<td><strong>Performance</strong></td>
+<td>Conversation, response time, and token cards; agent workload trend; conversations by model; model and topic detail table</td>
 </tr>
 </tbody></table></div>
 <h3 id="design-guidelines">Design Guidelines<a class="anchor" href="#design-guidelines" aria-hidden="true">#</a></h3>
 <ul>
-<li>Use the organization&#39;s brand palette for consistent theming.</li>
+<li>The report ships with the <code>ObservabilityControlTower</code> theme, which applies the RVAP brand palette to data colors, text classes, and visual styling.</li>
 <li>Apply row-level security (RLS) roles mapped to subscription or resource-group ownership.</li>
-<li>Enable paginated export for the Resource Inventory page.</li>
+<li>Connect additional reports through <strong>OneLake data hub</strong> → the published semantic model, which uses <strong>Direct Lake</strong> mode so no data copy is created.</li>
 </ul>
 <h2 id="integration-with-other-components">Integration with Other Components<a class="anchor" href="#integration-with-other-components" aria-hidden="true">#</a></h2>
 <div class="table-wrap"><table><thead><tr>
@@ -451,7 +452,8 @@ ResourceInventory (dim_resource) ──1:*──▶ CostSummary</code></pre>
 │       ├── requirements.txt
 │       ├── semantic_model.json     # Direct Lake semantic model definition
 │       ├── setup_fabric_workspace.py
-│       └── setup_cosmos_mirroring.py
+│       ├── setup_cosmos_mirroring.py
+│       └── deploy_report.py        # Imports the PBIR report and binds the model
 ├── .gitignore
 ├── azure.yaml                      # azd manifest
 └── README.md</code></pre>
@@ -469,7 +471,7 @@ ResourceInventory (dim_resource) ──1:*──▶ CostSummary</code></pre>
         </article>
         
         <div class="filetree">
-          <div class="filetree-head">📁 fabric-control-tower — 16 files · click any file to view it here (syntax-highlighted)</div>
+          <div class="filetree-head">📁 fabric-control-tower — 17 files · click any file to view it here (syntax-highlighted)</div>
           <ul>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2F.github%2Fworkflows%2Fdeploy.yml"><span class="ic">›</span>fabric-control-tower/.github/workflows/deploy.yml</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2F.gitignore"><span class="ic">›</span>fabric-control-tower/.gitignore</a></li>
@@ -483,6 +485,7 @@ ResourceInventory (dim_resource) ──1:*──▶ CostSummary</code></pre>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fpipelines%2Fpipeline_load_e2e.json"><span class="ic">›</span>fabric-control-tower/fabric/pipelines/pipeline_load_e2e.json</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Finfra%2Fmain.bicep"><span class="ic">›</span>fabric-control-tower/infra/main.bicep</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Finfra%2Fmain.parameters.json"><span class="ic">›</span>fabric-control-tower/infra/main.parameters.json</a></li>
+            <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2Fdeploy_report.py"><span class="ic">›</span>fabric-control-tower/src/setup/deploy_report.py</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2Frequirements.txt"><span class="ic">›</span>fabric-control-tower/src/setup/requirements.txt</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2Fsemantic_model.json"><span class="ic">›</span>fabric-control-tower/src/setup/semantic_model.json</a></li>
             <li><a href="../../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2Fsetup_cosmos_mirroring.py"><span class="ic">›</span>fabric-control-tower/src/setup/setup_cosmos_mirroring.py</a></li>
