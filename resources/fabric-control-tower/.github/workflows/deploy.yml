@@ -68,6 +68,7 @@ jobs:
           python src/setup/setup_fabric_workspace.py \
             --workspace-name "${{ vars.WORKSPACE_NAME }}" \
             --storage-account-url "${{ secrets.STORAGE_ACCOUNT_URL }}" \
+            --connection-id "${{ secrets.STORAGE_CONNECTION_ID }}" \
             --capacity-id "${{ secrets.FABRIC_CAPACITY_ID }}"
         continue-on-error: false
 

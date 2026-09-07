@@ -106,6 +106,7 @@ pip install -r src/setup/requirements.txt
 python src/setup/setup_fabric_workspace.py \
   --workspace-name "Observability-Analytics" \
   --storage-account-url "https://<account>.dfs.core.windows.net" \
+  --connection-id "<fabric-connection-id>" \
   --capacity-id "<fabric-capacity-id>"
 ```
 
