@@ -35,7 +35,7 @@ One is enough. Multiple is fully supported and realistic — e.g., workload in o
 exports scoped at the billing account. Record your subscription IDs in Challenge 0.
 
 **Which region should we use?**
-One that offers **both** your chosen model (`gpt-4o` / `gpt-4o-mini`) **and** Microsoft Fabric. East
+One that offers **both** the reference model (`gpt-5-mini`) **and** Microsoft Fabric. East
 US 2, West US 3, and Sweden Central are safe defaults. Keep all resources in one region to avoid
 egress charges with OneLake shortcuts.
 
@@ -115,7 +115,7 @@ available). Cosmos DB is encrypted at rest. All traffic uses TLS 1.2+.
 
 **What will this cost us?**
 Low for an RVAS: Fabric is free on trial; the agent workload runs a few dollars/day with
-`gpt-4o-mini`, serverless Cosmos DB, and scale-to-low Container Apps (APIM Developer tier is the main
+`gpt-5-mini`, serverless Cosmos DB, and scale-to-low Container Apps (APIM Developer tier is the main
 fixed cost); the landing zone is inexpensive. **Tear everything down** with `azd down --purge` and
 end the Fabric trial / delete the workspace when finished.
 
