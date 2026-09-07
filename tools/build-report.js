@@ -128,6 +128,12 @@ function card(page, name, position, projection, title, accent) {
   visual(page, name, position, {
     visualType: 'cardVisual',
     query: { queryState: { Data: { projections: [projection] } } },
+    // These objects take a 'default' selector, which theme visualStyles cannot target.
+    objects: {
+      label: [{ properties: { show: bool(false) }, selector: { id: 'default' } }],
+      outline: [{ properties: { show: bool(false) }, selector: { id: 'default' } }],
+      fillCustom: [{ properties: { show: bool(true), fillColor: solid(C.white), transparency: num(0) }, selector: { id: 'default' } }],
+    },
     visualContainerObjects: titleVco(title, accent),
   });
 }
@@ -255,14 +261,11 @@ writeJson(path.join(ROOT, 'StaticResources', 'RegisteredResources', `${THEME}.js
     clusteredColumnChart: chartStyle,
     clusteredBarChart: chartStyle,
     cardVisual: {
-      // cardVisual rejects border.radius at theme level; the corner radius is set per visual instead.
+      // cardVisual rejects border.radius at theme level; radius, label, outline and fill are set per visual.
       '*': {
         background: panel,
         border: [{ show: true, color: { solid: { color: C.neutral } } }],
         visualHeader: [{ show: false }],
-        outline: [{ show: false }],
-        // The container title already names the measure; the card's own label would repeat it.
-        label: [{ show: false }],
       },
     },
     tableEx: {
