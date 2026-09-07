@@ -325,6 +325,11 @@
           {
             "show": false
           }
+        ],
+        "label": [
+          {
+            "show": false
+          }
         ]
       }
     },

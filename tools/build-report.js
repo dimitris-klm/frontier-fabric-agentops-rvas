@@ -261,6 +261,8 @@ writeJson(path.join(ROOT, 'StaticResources', 'RegisteredResources', `${THEME}.js
         border: [{ show: true, color: { solid: { color: C.neutral } } }],
         visualHeader: [{ show: false }],
         outline: [{ show: false }],
+        // The container title already names the measure; the card's own label would repeat it.
+        label: [{ show: false }],
       },
     },
     tableEx: {
