@@ -417,7 +417,7 @@
           {
             "name": "agent_id",
             "dataType": "string",
-            "sourceColumn": "agent_id",
+            "sourceColumn": "model_name",
             "lineageTag": "agent-id-column",
             "summarizeBy": "none",
             "type": "data"
