@@ -415,7 +415,7 @@
             "formatString": "General Date"
           },
           {
-            "name": "agent_id",
+            "name": "model_name",
             "dataType": "string",
             "sourceColumn": "model_name",
             "lineageTag": "agent-id-column",
