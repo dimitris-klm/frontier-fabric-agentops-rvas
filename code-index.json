@@ -122,7 +122,7 @@
         "Power BI"
       ],
       "readme": "resources/fabric-control-tower/README.html",
-      "count": 15,
+      "count": 16,
       "files": [
         {
           "path": "resources/fabric-control-tower/.github/workflows/deploy.yml",
