@@ -151,6 +151,37 @@ Run the notebooks in order — either manually in Fabric or via the E2E pipeline
 
 To trigger all four in sequence, open the **Load E2E Pipeline** in Fabric and click **Run**.
 
+### 5. Configure GitHub Actions (optional)
+
+`.github/workflows/deploy.yml` runs steps 1–3 automatically on every push to `main` that
+touches `infra/`, `src/`, or `fabric/`. It reads every value from repository configuration,
+so populate all of the following before the first run:
+
+| Name | Kind | Supplies |
+|---|---|---|
+| `AZURE_CLIENT_ID` | Secret | OIDC login |
+| `AZURE_TENANT_ID` | Secret | OIDC login |
+| `AZURE_SUBSCRIPTION_ID` | Secret | OIDC login |
+| `WORKSPACE_NAME` | Variable | `setup_fabric_workspace.py --workspace-name` |
+| `STORAGE_ACCOUNT_URL` | Secret | `setup_fabric_workspace.py --storage-account-url` |
+| `STORAGE_CONNECTION_ID` | Secret | `setup_fabric_workspace.py --connection-id` |
+| `FABRIC_CAPACITY_ID` | Secret | `setup_fabric_workspace.py --capacity-id` |
+| `FABRIC_WORKSPACE_ID` | Secret | `setup_cosmos_mirroring.py --workspace-id` |
+| `COSMOS_ACCOUNT` | Secret | `setup_cosmos_mirroring.py --cosmos-account` |
+| `COSMOS_DATABASE` | Secret | `setup_cosmos_mirroring.py --database` |
+| `COSMOS_CONNECTION_ID` | Secret | `setup_cosmos_mirroring.py --connection-id` |
+
+Both `*_CONNECTION_ID` values are Fabric **cloud connection** IDs, not Azure resource IDs.
+Create them under **Settings → Manage connections and gateways**: an ADLS Gen2 connection for
+the storage account, and an Azure Cosmos DB v2 connection for the Cosmos account.
+
+A name that is missing or misspelled expands to an empty string rather than failing, so the
+run reaches the setup step and errors there instead. If a step fails on an argument you
+believe you configured, check the spelling of the corresponding name above first.
+
+The job targets the `dev`, `staging`, or `prod` environment. Define these at repository level
+to share them, or per environment to vary them.
+
 ## Notebooks
 
 ### 01_bronze_ingestion.ipynb

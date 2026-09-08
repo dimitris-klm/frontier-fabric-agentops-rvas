@@ -52,6 +52,7 @@
           <li><a class="h3" href="#2-configure-fabric-workspace">2. Configure Fabric Workspace</a></li>
           <li><a class="h3" href="#3-configure-cosmos-db-mirroring">3. Configure Cosmos DB Mirroring</a></li>
           <li><a class="h3" href="#4-run-notebooks">4. Run Notebooks</a></li>
+          <li><a class="h3" href="#5-configure-github-actions-optional">5. Configure GitHub Actions (optional)</a></li>
           <li><a class="h2" href="#notebooks">Notebooks</a></li>
           <li><a class="h3" href="#01bronzeingestionipynb">01_bronze_ingestion.ipynb</a></li>
           <li><a class="h3" href="#02silvertransformationipynb">02_silver_transformation.ipynb</a></li>
@@ -241,6 +242,79 @@ python src/setup/setup_fabric_workspace.py \
 </tr>
 </tbody></table></div>
 <p>To trigger all four in sequence, open the <strong>Load E2E Pipeline</strong> in Fabric and click <strong>Run</strong>.</p>
+<h3 id="5-configure-github-actions-optional">5. Configure GitHub Actions (optional)<a class="anchor" href="#5-configure-github-actions-optional" aria-hidden="true">#</a></h3>
+<p><code>.github/workflows/deploy.yml</code> runs steps 1–3 automatically on every push to <code>main</code> that
+touches <code>infra/</code>, <code>src/</code>, or <code>fabric/</code>. It reads every value from repository configuration,
+so populate all of the following before the first run:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Name</th>
+<th>Kind</th>
+<th>Supplies</th>
+</tr>
+</thead><tbody><tr>
+<td><code>AZURE_CLIENT_ID</code></td>
+<td>Secret</td>
+<td>OIDC login</td>
+</tr>
+<tr>
+<td><code>AZURE_TENANT_ID</code></td>
+<td>Secret</td>
+<td>OIDC login</td>
+</tr>
+<tr>
+<td><code>AZURE_SUBSCRIPTION_ID</code></td>
+<td>Secret</td>
+<td>OIDC login</td>
+</tr>
+<tr>
+<td><code>WORKSPACE_NAME</code></td>
+<td>Variable</td>
+<td><code>setup_fabric_workspace.py --workspace-name</code></td>
+</tr>
+<tr>
+<td><code>STORAGE_ACCOUNT_URL</code></td>
+<td>Secret</td>
+<td><code>setup_fabric_workspace.py --storage-account-url</code></td>
+</tr>
+<tr>
+<td><code>STORAGE_CONNECTION_ID</code></td>
+<td>Secret</td>
+<td><code>setup_fabric_workspace.py --connection-id</code></td>
+</tr>
+<tr>
+<td><code>FABRIC_CAPACITY_ID</code></td>
+<td>Secret</td>
+<td><code>setup_fabric_workspace.py --capacity-id</code></td>
+</tr>
+<tr>
+<td><code>FABRIC_WORKSPACE_ID</code></td>
+<td>Secret</td>
+<td><code>setup_cosmos_mirroring.py --workspace-id</code></td>
+</tr>
+<tr>
+<td><code>COSMOS_ACCOUNT</code></td>
+<td>Secret</td>
+<td><code>setup_cosmos_mirroring.py --cosmos-account</code></td>
+</tr>
+<tr>
+<td><code>COSMOS_DATABASE</code></td>
+<td>Secret</td>
+<td><code>setup_cosmos_mirroring.py --database</code></td>
+</tr>
+<tr>
+<td><code>COSMOS_CONNECTION_ID</code></td>
+<td>Secret</td>
+<td><code>setup_cosmos_mirroring.py --connection-id</code></td>
+</tr>
+</tbody></table></div>
+<p>Both <code>*_CONNECTION_ID</code> values are Fabric <strong>cloud connection</strong> IDs, not Azure resource IDs.
+Create them under <strong>Settings → Manage connections and gateways</strong>: an ADLS Gen2 connection for
+the storage account, and an Azure Cosmos DB v2 connection for the Cosmos account.</p>
+<p>A name that is missing or misspelled expands to an empty string rather than failing, so the
+run reaches the setup step and errors there instead. If a step fails on an argument you
+believe you configured, check the spelling of the corresponding name above first.</p>
+<p>The job targets the <code>dev</code>, <code>staging</code>, or <code>prod</code> environment. Define these at repository level
+to share them, or per environment to vary them.</p>
 <h2 id="notebooks">Notebooks<a class="anchor" href="#notebooks" aria-hidden="true">#</a></h2>
 <h3 id="01bronzeingestionipynb">01_bronze_ingestion.ipynb<a class="anchor" href="#01bronzeingestionipynb" aria-hidden="true">#</a></h3>
 <p>Reads raw Parquet files from ADLS Gen2 shortcuts and writes Delta tables into the schema-enabled Lakehouse <code>Tables/dbo/</code> section.</p>
