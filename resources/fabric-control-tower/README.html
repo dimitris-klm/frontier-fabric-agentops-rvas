@@ -132,9 +132,9 @@ tower</strong> itself — the Fabric workspace you stand up across
 │                    │                                                        │
 │  ┌─────────────────▼───────────────────┐   ┌────────────────────────────┐  │
 │  │  Semantic Model (Direct Lake)       │──▶│  Power BI Reports          │  │
-│  │  fact_costs, fact_metrics, ...      │   │  Cost Overview             │  │
-│  │  dim_resource, dim_date, ...        │   │  Capacity Utilization      │  │
-│  │  Measures: TotalCost, ErrorRate ... │   │  Operational Health        │  │
+│  │  CostSummary, OperationalMetrics    │   │  Cost Overview             │  │
+│  │  AgentAnalytics + dimensions        │   │  Operational Health        │  │
+│  │  Measures: TotalCost, ErrorRate ... │   │  Performance               │  │
 │  └─────────────────────────────────────┘   │  Agent Performance         │  │
 │                                            │  Resource Inventory        │  │
 │                                            └────────────────────────────┘  │
@@ -340,17 +340,11 @@ python src/setup/setup_fabric_workspace.py \
 <h2 id="semantic-model">Semantic Model<a class="anchor" href="#semantic-model" aria-hidden="true">#</a></h2>
 <p>The Direct Lake semantic model connects Power BI directly to Delta tables in OneLake — no import or DirectQuery overhead.</p>
 <h3 id="tables-and-relationships">Tables and Relationships<a class="anchor" href="#tables-and-relationships" aria-hidden="true">#</a></h3>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>dim_date ──────────┐
-                   │ 1:*
-fact_costs ◄───────┤
-                   │ 1:*
-dim_resource ──────┤
-                   │ 1:*
-fact_metrics ◄─────┤
-                   │ 1:*
-fact_operations ◄──┘
-                   
-fact_agent_analytics ──▶ dim_date</code></pre>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>Calendar (dim_date) ──1:*──▶ CostSummary
+                    ├─1:*──▶ OperationalMetrics
+                    └─1:*──▶ AgentAnalytics
+
+ResourceInventory (dim_resource) ──1:*──▶ CostSummary</code></pre>
 <h3 id="key-measures">Key Measures<a class="anchor" href="#key-measures" aria-hidden="true">#</a></h3>
 <div class="table-wrap"><table><thead><tr>
 <th>Measure</th>
@@ -358,35 +352,31 @@ fact_agent_analytics ──▶ dim_date</code></pre>
 </tr>
 </thead><tbody><tr>
 <td>TotalCost</td>
-<td><code>SUM(fact_costs[BilledCost])</code></td>
+<td><code>SUM(CostSummary[monthly_cost])</code></td>
 </tr>
 <tr>
-<td>CostMoM%</td>
+<td>CostMoMChange</td>
 <td>Month-over-month cost change percentage</td>
 </tr>
 <tr>
-<td>CapacityUtilization</td>
-<td><code>AVERAGE(fact_metrics[CPUPercent])</code></td>
-</tr>
-<tr>
 <td>ErrorRate</td>
-<td><code>DIVIDE(COUNTROWS(FILTER(fact_operations, [Severity] = &quot;Error&quot;)), COUNTROWS(fact_operations))</code></td>
+<td><code>DIVIDE(SUM(OperationalMetrics[error_count]), SUM(OperationalMetrics[total_requests]), 0)</code></td>
 </tr>
 <tr>
 <td>P95Latency</td>
-<td><code>PERCENTILE.INC(fact_operations[DurationMs], 0.95)</code></td>
+<td><code>AVERAGE(OperationalMetrics[p95_latency_ms])</code></td>
 </tr>
 <tr>
-<td>AvgSatisfaction</td>
-<td><code>AVERAGE(fact_agent_analytics[SatisfactionScore])</code></td>
+<td>TotalConversations</td>
+<td><code>SUM(AgentAnalytics[total_conversations])</code></td>
 </tr>
 <tr>
-<td>ConversationCount</td>
-<td><code>DISTINCTCOUNT(fact_agent_analytics[ConversationId])</code></td>
+<td>TotalTokens</td>
+<td><code>SUM(AgentAnalytics[total_tokens_used])</code></td>
 </tr>
 </tbody></table></div>
 <h3 id="time-intelligence">Time Intelligence<a class="anchor" href="#time-intelligence" aria-hidden="true">#</a></h3>
-<p>All cost and metric measures include time-intelligence variants: YTD, MTD, QTD, prior period, and rolling 30-day averages. These are generated via a calculation group applied to <code>dim_date</code>.</p>
+<p>The model includes YTD and prior-month cost measures using the physical <code>dim_date</code> table.</p>
 <h2 id="power-bi-report">Power BI Report<a class="anchor" href="#power-bi-report" aria-hidden="true">#</a></h2>
 <h3 id="connecting-to-the-semantic-model">Connecting to the Semantic Model<a class="anchor" href="#connecting-to-the-semantic-model" aria-hidden="true">#</a></h3>
 <ol>
@@ -404,16 +394,12 @@ fact_agent_analytics ──▶ dim_date</code></pre>
 <td>KPI cards (total cost, MoM trend), cost-by-service bar chart, daily cost line chart with forecast, top-10 cost drivers table</td>
 </tr>
 <tr>
-<td><strong>Capacity Utilization</strong></td>
-<td>Gauge charts per capacity metric, heatmap by resource and hour, utilization trend with threshold lines</td>
-</tr>
-<tr>
 <td><strong>Operational Health</strong></td>
 <td>Error-rate trend, P95 latency sparklines, availability scorecards, log-severity breakdown donut chart</td>
 </tr>
 <tr>
 <td><strong>Agent Performance</strong></td>
-<td>Conversation volume over time, avg response time, token consumption bar chart, satisfaction trend, resolution rate funnel</td>
+<td>Conversation, interaction, and session volume; response time; token consumption by model and topic</td>
 </tr>
 <tr>
 <td><strong>Resource Inventory</strong></td>

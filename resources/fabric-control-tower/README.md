@@ -59,9 +59,9 @@ Raw telemetry — cost exports, platform metrics, diagnostic logs, and AI-agent 
 │                    │                                                        │
 │  ┌─────────────────▼───────────────────┐   ┌────────────────────────────┐  │
 │  │  Semantic Model (Direct Lake)       │──▶│  Power BI Reports          │  │
-│  │  fact_costs, fact_metrics, ...      │   │  Cost Overview             │  │
-│  │  dim_resource, dim_date, ...        │   │  Capacity Utilization      │  │
-│  │  Measures: TotalCost, ErrorRate ... │   │  Operational Health        │  │
+│  │  CostSummary, OperationalMetrics    │   │  Cost Overview             │  │
+│  │  AgentAnalytics + dimensions        │   │  Operational Health        │  │
+│  │  Measures: TotalCost, ErrorRate ... │   │  Performance               │  │
 │  └─────────────────────────────────────┘   │  Agent Performance         │  │
 │                                            │  Resource Inventory        │  │
 │                                            └────────────────────────────┘  │
@@ -237,34 +237,27 @@ The Direct Lake semantic model connects Power BI directly to Delta tables in One
 ### Tables and Relationships
 
 ```
-dim_date ──────────┐
-                   │ 1:*
-fact_costs ◄───────┤
-                   │ 1:*
-dim_resource ──────┤
-                   │ 1:*
-fact_metrics ◄─────┤
-                   │ 1:*
-fact_operations ◄──┘
-                   
-fact_agent_analytics ──▶ dim_date
+Calendar (dim_date) ──1:*──▶ CostSummary
+                    ├─1:*──▶ OperationalMetrics
+                    └─1:*──▶ AgentAnalytics
+
+ResourceInventory (dim_resource) ──1:*──▶ CostSummary
 ```
 
 ### Key Measures
 
 | Measure | Expression (DAX) |
 |---|---|
-| TotalCost | `SUM(fact_costs[BilledCost])` |
-| CostMoM% | Month-over-month cost change percentage |
-| CapacityUtilization | `AVERAGE(fact_metrics[CPUPercent])` |
-| ErrorRate | `DIVIDE(COUNTROWS(FILTER(fact_operations, [Severity] = "Error")), COUNTROWS(fact_operations))` |
-| P95Latency | `PERCENTILE.INC(fact_operations[DurationMs], 0.95)` |
-| AvgSatisfaction | `AVERAGE(fact_agent_analytics[SatisfactionScore])` |
-| ConversationCount | `DISTINCTCOUNT(fact_agent_analytics[ConversationId])` |
+| TotalCost | `SUM(CostSummary[monthly_cost])` |
+| CostMoMChange | Month-over-month cost change percentage |
+| ErrorRate | `DIVIDE(SUM(OperationalMetrics[error_count]), SUM(OperationalMetrics[total_requests]), 0)` |
+| P95Latency | `AVERAGE(OperationalMetrics[p95_latency_ms])` |
+| TotalConversations | `SUM(AgentAnalytics[total_conversations])` |
+| TotalTokens | `SUM(AgentAnalytics[total_tokens_used])` |
 
 ### Time Intelligence
 
-All cost and metric measures include time-intelligence variants: YTD, MTD, QTD, prior period, and rolling 30-day averages. These are generated via a calculation group applied to `dim_date`.
+The model includes YTD and prior-month cost measures using the physical `dim_date` table.
 
 ## Power BI Report
 
@@ -279,9 +272,8 @@ All cost and metric measures include time-intelligence variants: YTD, MTD, QTD, 
 | Page | Key Visuals |
 |---|---|
 | **Cost Overview** | KPI cards (total cost, MoM trend), cost-by-service bar chart, daily cost line chart with forecast, top-10 cost drivers table |
-| **Capacity Utilization** | Gauge charts per capacity metric, heatmap by resource and hour, utilization trend with threshold lines |
 | **Operational Health** | Error-rate trend, P95 latency sparklines, availability scorecards, log-severity breakdown donut chart |
-| **Agent Performance** | Conversation volume over time, avg response time, token consumption bar chart, satisfaction trend, resolution rate funnel |
+| **Agent Performance** | Conversation, interaction, and session volume; response time; token consumption by model and topic |
 | **Resource Inventory** | Resource count by type/region matrix, change timeline (SCD events), tag compliance percentage, orphaned resource list |
 
 ### Design Guidelines

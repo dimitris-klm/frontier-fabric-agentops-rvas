@@ -47,11 +47,6 @@
           <li><a class="h2" href="#snapshot">Snapshot</a></li>
           <li><a class="h2" href="#coaching-objectives">Coaching objectives</a></li>
           <li><a class="h2" href="#the-reference-path">The reference path</a></li>
-          <li><a class="h2" href="#checkpoint-verification">Checkpoint verification</a></li>
-          <li><a class="h2" href="#common-pitfalls-fixes">Common pitfalls &amp; fixes</a></li>
-          <li><a class="h2" href="#talking-points-mini-briefing">Talking points (mini-briefing)</a></li>
-          <li><a class="h2" href="#if-they-finish-early">If they finish early</a></li>
-          <li><a class="h2" href="#reference-assets">Reference assets</a></li>
         </ul>
       </aside>
       <main class="doc-main">
@@ -88,8 +83,8 @@
 ornamentation:</p>
 <ol>
 <li><strong>Reliability</strong> — Which agents are healthy? Where are errors and latency spikes coming from?</li>
-<li><strong>Cost</strong> — What is each agent, service, team, or use case costing?</li>
-<li><strong>Performance</strong> — Are we meeting SLAs, and how much traffic/tokens/capacity are we consuming?</li>
+<li><strong>Cost</strong> — What is each service or Azure resource costing?</li>
+<li><strong>Performance</strong> — Are we meeting SLAs, and how much traffic and token usage are we seeing?</li>
 </ol>
 <p>Your job is to connect every visual back to one of those questions, then verify the semantic model is
 trustworthy: correct relationships, correct DAX, and Direct Lake over the Challenge 4 Gold tables.</p>
@@ -101,135 +96,144 @@ agent/service/resource/date, and can explain which Gold table powers each answer
 <ul>
 <li>Confirm Challenge 4 produced the Gold data products listed in <a href="../docs/architecture.html"><code>docs/architecture.md</code></a>:
 <code>gold_cost_summary</code>, <code>gold_operational_metrics</code>, <code>gold_agent_analytics</code>,
-<code>gold_capacity_usage</code>, <code>gold_resource_inventory</code>, <code>dim_date</code>, and <code>dim_resource</code>.</li>
+<code>gold_resource_inventory</code>, <code>dim_date</code>, and <code>dim_resource</code>.</li>
+<li>If either dimension is missing, run <code>05_semantic_model_dimensions.ipynb</code> after notebooks 03 and 04.</li>
 <li>If using the provided JSON, note its display names: <code>CostSummary</code>, <code>OperationalMetrics</code>,
-<code>AgentAnalytics</code>, <code>CapacityUsage</code>, <code>ResourceInventory</code>, and <code>Calendar</code>.</li>
+ <code>AgentAnalytics</code>, <code>ResourceInventory</code>, and <code>Calendar</code>.</li>
 </ul>
 </li>
 <li><p><strong>Create the Direct Lake semantic model</strong></p>
 <ul>
 <li>Create a model from the Lakehouse Gold tables, or import/adapt:
 <a href="../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2Fsemantic_model.json"><code>resources/fabric-control-tower/src/setup/semantic_model.json</code></a>.</li>
-<li>Bind fact tables to the Gold Delta entities.</li>
-<li>Build relationships from facts to the date and resource dimensions.</li>
-<li>Mark/filter date fields consistently so YTD/MTD and rolling periods work.</li>
+<li>For a manual model, rename the tables to <code>CostSummary</code>, <code>OperationalMetrics</code>,
+<code>AgentAnalytics</code>, <code>ResourceInventory</code>, and <code>Calendar</code>.</li>
+<li>Create these active one-to-many (<code>1:*</code>) relationships with single-direction filtering from the
+dimensions:<ul>
+<li><code>Calendar[Date]</code> to <code>CostSummary[period_start]</code></li>
+<li><code>Calendar[Date]</code> to <code>OperationalMetrics[metric_date]</code></li>
+<li><code>Calendar[Date]</code> to <code>AgentAnalytics[interaction_date]</code></li>
+<li><code>ResourceInventory[resource_id]</code> to <code>CostSummary[resource_id]</code></li>
+</ul>
+</li>
+<li>Delete or deactivate conflicting auto-detected relationships.</li>
+<li>Mark <code>Calendar</code> as the date table using the <code>Date</code> column so <code>TOTALYTD</code> and <code>DATEADD</code> resolve
+correctly; the provided JSON already sets <code>dataCategory: &quot;Time&quot;</code> on the table.</li>
+<li>Replace the <code>DatabaseQuery</code> placeholders with the Challenge 3 SQL analytics endpoint and
+Lakehouse database name before deploying the JSON definition.</li>
 </ul>
 </li>
 <li><p><strong>Author the key measures</strong>
-Use the README measures as the baseline. At minimum, verify <code>TotalCost</code>, <code>ErrorRate</code>,
-<code>P95Latency</code>, and cost-per-agent/cost-per-request.</p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-DAX">TotalCost = SUM(fact_costs[BilledCost])
-
-ErrorRate =
-DIVIDE(
-    COUNTROWS(FILTER(fact_operations, [Severity] = &quot;Error&quot;)),
-    COUNTROWS(fact_operations)
-)
-
-P95Latency = PERCENTILE.INC(fact_operations[DurationMs], 0.95)
-
-CostMoM% =
-VAR CurrentMonth = [TotalCost]
-VAR PreviousMonth = CALCULATE([TotalCost], DATEADD(dim_date[Date], -1, MONTH))
-RETURN DIVIDE(CurrentMonth - PreviousMonth, PreviousMonth, 0)
-
-CostPerAgent =
-DIVIDE([TotalCost], DISTINCTCOUNT(fact_agent_analytics[AgentId]))</code></pre>
-<p>Also check the README list: <code>CapacityUtilization</code>, <code>AvgSatisfaction</code>, and <code>ConversationCount</code>.
-If the team imported the provided JSON, adapt the column names to the model&#39;s table names rather
-than creating duplicate disconnected measures.</p>
-</li>
-<li><p><strong>Build the three report pages</strong></p>
-<ul>
-<li><strong>Reliability:</strong> error rate trend by agent/error type, P95/P99 latency, availability, pipeline health.</li>
-<li><strong>Cost:</strong> cost by service/agent, MoM trend and forecast, run rate by team/use case, top cost drivers.</li>
-<li><strong>Performance:</strong> throughput, prompt/completion token consumption, satisfaction trend, capacity utilization.</li>
-</ul>
-</li>
-<li><p><strong>Verify Direct Lake</strong></p>
-<ul>
-<li>Gold-backed tables show storage mode = <strong>Direct Lake</strong>.</li>
-<li>There is no imported data copy and no scheduled refresh dependency.</li>
-<li>The report reads Delta directly after pipeline runs. If Gold schema changed, resync model metadata.</li>
-</ul>
+  Use these formulas when the model was created manually from the Lakehouse tables. The provided
+  JSON uses friendly aliases for some physical columns but defines equivalent measures.</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-DAX"></code></pre>
 </li>
 </ol>
-<h2 id="checkpoint-verification">Checkpoint verification<a class="anchor" href="#checkpoint-verification" aria-hidden="true">#</a></h2>
-<p>Have the team present the report as if leadership is in the room:</p>
-<ol>
-<li><strong>Reliability:</strong> &quot;Which agent or service is least healthy right now, and why?&quot;</li>
-<li><strong>Cost:</strong> &quot;What is the biggest cost driver, and what is the cost per agent/request?&quot;</li>
-<li><strong>Performance:</strong> &quot;Are we meeting SLA expectations, and what is traffic/token usage doing?&quot;</li>
-</ol>
-<p>Then test the model:</p>
-<ul>
-<li>Select one agent/service/resource and confirm cross-filtering updates all relevant visuals.</li>
-<li>Open the model view and show fact-to-date/resource relationships.</li>
-<li>Show storage mode = Direct Lake for Gold-backed tables.</li>
-<li>Inspect at least <code>TotalCost</code>, <code>ErrorRate</code>, <code>P95Latency</code>, and cost-per-agent/request DAX.</li>
-</ul>
-<p>✅ Pass when the team answers the three questions live and the model is confirmed Direct Lake.</p>
-<h2 id="common-pitfalls-fixes">Common pitfalls &amp; fixes<a class="anchor" href="#common-pitfalls-fixes" aria-hidden="true">#</a></h2>
-<div class="table-wrap"><table><thead><tr>
-<th>Pitfall</th>
-<th>Fix</th>
-</tr>
-</thead><tbody><tr>
-<td>Semantic model not bound to Lakehouse <strong>Gold</strong> tables</td>
-<td>Rebind to the Gold Delta entities from Challenge 4; do not build visuals directly on Bronze/Silver or scratch tables</td>
-</tr>
-<tr>
-<td>Relationships missing → totals look right but slicers lie</td>
-<td>Recreate fact-to-date and fact-to-resource relationships; test with a single date/resource selection</td>
-</tr>
-<tr>
-<td>Direct Lake falls back to DirectQuery because of unsupported DAX/model behavior</td>
-<td>Simplify the measure/model pattern; keep transformations in Gold, not in the semantic model</td>
-</tr>
-<tr>
-<td>Measures reference wrong columns after importing/adapting the JSON</td>
-<td>Compare table names in <code>semantic_model.json</code> with the team&#39;s Lakehouse schema and update DAX once, centrally</td>
-</tr>
-<tr>
-<td>Power BI license/capacity needed to publish or share</td>
-<td>Use the Fabric workspace assigned to capacity from Challenge 0; publish within that workspace</td>
-</tr>
-<tr>
-<td>Gold data changed but the model appears stale</td>
-<td>Direct Lake auto-reflects data rows, but schema changes may require model metadata re-sync</td>
-</tr>
-</tbody></table></div>
-<h2 id="talking-points-mini-briefing">Talking points (mini-briefing)<a class="anchor" href="#talking-points-mini-briefing" aria-hidden="true">#</a></h2>
-<ul>
-<li><strong>Direct Lake = import-style performance with no copy and no refresh window.</strong> The Delta table is the
-source of truth; Power BI is not another data silo.</li>
-<li><strong>One model, three audiences.</strong> SREs get reliability, FinOps gets cost, product/AI teams get
-performance — all filtered from the same semantic layer.</li>
-<li><strong>This is the deliverable leadership asked for.</strong> Everything before this challenge was plumbing;
-this is where the Control Tower becomes visible and defensible.</li>
-<li><strong>Correct measures beat pretty visuals.</strong> A beautiful report with broken relationships is worse than
-a plain report that answers the question accurately.</li>
-</ul>
-<h2 id="if-they-finish-early">If they finish early<a class="anchor" href="#if-they-finish-early" aria-hidden="true">#</a></h2>
-<ul>
-<li>Add a KPI scorecard page that rolls up reliability, cost, and performance targets.</li>
-<li>Add drill-through from a summary visual to an agent detail page.</li>
-<li>Add conditional formatting and alt text for executive readability and accessibility.</li>
-<li>Create a mobile layout for incident reviews on the go.</li>
-<li>Add bookmarks for &quot;SRE view&quot;, &quot;FinOps view&quot;, and &quot;Leadership view&quot;.</li>
-<li>Add a tooltip page that explains the KPI definitions in business language.</li>
-<li>Add a lightweight usage note so report consumers know which slicers to use first.</li>
-</ul>
-<h2 id="reference-assets">Reference assets<a class="anchor" href="#reference-assets" aria-hidden="true">#</a></h2>
-<ul>
-<li><a href="../resources/fabric-control-tower/README.html"><code>resources/fabric-control-tower/README.md</code></a> — semantic model measures and suggested report pages</li>
-<li><a href="../code.html?path=resources%2Ffabric-control-tower%2Fsrc%2Fsetup%2Fsemantic_model.json"><code>resources/fabric-control-tower/src/setup/semantic_model.json</code></a> — actual provided semantic model definition</li>
-<li><a href="../docs/architecture.html"><code>docs/architecture.md</code></a> — Gold tables, Core KPIs, and Direct Lake role in the architecture</li>
-<li><a href="../challenges/challenge-04-medallion-pipeline.html"><code>challenges/challenge-04-medallion-pipeline.md</code></a> — prerequisite Gold pipeline</li>
-<li><a href="../challenges/challenge-06-operationalize.html"><code>challenges/challenge-06-operationalize.md</code></a> — next operationalization stretch</li>
-</ul>
-<p>Bring this guide to the final showcase rehearsal; Challenge 5 is where the story either lands or
-exposes model gaps that must be fixed before operationalization.</p>
+<p>  TotalCost = SUM(CostSummary[monthly_cost])</p>
+<p>  AvgMonthlyCost =
+  AVERAGEX(
+        VALUES(CostSummary[period_start]),
+        [TotalCost]
+  )</p>
+<p>  CostYTD = TOTALYTD([TotalCost], Calendar[Date])</p>
+<p>  CostMoMChange =
+  VAR CurrentPeriodCost = [TotalCost]
+  VAR PriorPeriodCost =
+        CALCULATE(
+              [TotalCost],
+              DATEADD(Calendar[Date], -1, MONTH)
+        )
+  RETURN
+        DIVIDE(CurrentPeriodCost - PriorPeriodCost, PriorPeriodCost)</p>
+<p>   ErrorRate =
+   DIVIDE(
+         SUM(OperationalMetrics[error_count]),
+         SUM(OperationalMetrics[total_events]),
+         0
+   )</p>
+<p>  P95Latency = AVERAGE(OperationalMetrics[latency_p95_ms])</p>
+<p>  Availability = AVERAGE(OperationalMetrics[availability_pct])</p>
+<p>  TotalConversations = SUM(AgentAnalytics[conversation_count])</p>
+<p>  AvgResponseTime = AVERAGE(AgentAnalytics[avg_response_time_ms])</p>
+<p>  TotalTokens = SUM(AgentAnalytics[total_tokens])</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code>
+  Format cost measures as currency, `CostMoMChange` and `ErrorRate` as percentages, counts as whole
+  numbers, and latency and response time as two-decimal numbers. `availability_pct` already stores
+  percentage points, so format `Availability` with a literal `%` suffix (`0.00&quot;%&quot;`) rather than a
+  true percentage format, which would multiply the value by 100.
+
+4. **Build the three report pages**
+- **Reliability:** error rate trend by agent/error type, P95/P99 latency, availability, pipeline health.
+- **Cost:** cost by service/agent, MoM trend and forecast, run rate by team/use case, top cost drivers.
+  - **Performance:** conversations, interactions, sessions, token consumption, and response time by model/topic.
+
+5. **Verify Direct Lake**
+- All five model tables show storage mode = **Direct Lake**; `Calendar` and `ResourceInventory`
+  bind to `dim_date` and `dim_resource`.
+- There is no imported data copy and no scheduled refresh dependency.
+- The report reads Delta directly after pipeline runs. If Gold schema changed, resync model metadata.
+
+## Checkpoint verification
+
+Have the team present the report as if leadership is in the room:
+
+1. **Reliability:** &quot;Which agent or service is least healthy right now, and why?&quot;
+2. **Cost:** &quot;What is the biggest cost driver, and what is the cost per agent/request?&quot;
+3. **Performance:** &quot;Are we meeting SLA expectations, and what is traffic/token usage doing?&quot;
+
+Then test the model:
+
+- Confirm the shared date slicer updates all three pages, then verify resource filtering across cost
+  and inventory visuals.
+- Open the model view and show fact-to-date/resource relationships.
+- Show storage mode = Direct Lake for Gold-backed tables.
+- Inspect at least `TotalCost`, `ErrorRate`, `P95Latency`, `TotalConversations`, and `TotalTokens` DAX.
+
+✅ Pass when the team answers the three questions live and the model is confirmed Direct Lake.
+
+## Common pitfalls &amp; fixes
+
+| Pitfall | Fix |
+|---|---|
+| Semantic model not bound to Lakehouse **Gold** tables | Rebind to the Gold Delta entities from Challenge 4; do not build visuals directly on Bronze/Silver or scratch tables |
+| Relationships missing → totals look right but slicers lie | Recreate fact-to-date and fact-to-resource relationships; test with a single date/resource selection |
+| `dim_date` or `dim_resource` is missing | Run `05_semantic_model_dimensions.ipynb` after both Gold-producing notebooks finish |
+| Direct Lake falls back to DirectQuery because of unsupported DAX/model behavior | Simplify the measure/model pattern; keep transformations in Gold or the dimension notebook, not in the semantic model |
+| Measures reference wrong columns after importing/adapting the JSON | Compare table names in `semantic_model.json` with the team&#39;s Lakehouse schema and update DAX once, centrally |
+| Power BI license/capacity needed to publish or share | Use the Fabric workspace assigned to capacity from Challenge 0; publish within that workspace |
+| Gold data changed but the model appears stale | Direct Lake auto-reflects data rows, but schema changes may require model metadata re-sync |
+
+## Talking points (mini-briefing)
+
+- **Direct Lake = import-style performance with no copy and no refresh window.** The Delta table is the
+  source of truth; Power BI is not another data silo.
+- **One model, three audiences.** SREs get reliability, FinOps gets cost, product/AI teams get
+  performance — all filtered from the same semantic layer.
+- **This is the deliverable leadership asked for.** Everything before this challenge was plumbing;
+  this is where the Control Tower becomes visible and defensible.
+- **Correct measures beat pretty visuals.** A beautiful report with broken relationships is worse than
+  a plain report that answers the question accurately.
+
+## If they finish early
+
+- Add a KPI scorecard page that rolls up reliability, cost, and performance targets.
+- Add drill-through from a summary visual to an agent detail page.
+- Add conditional formatting and alt text for executive readability and accessibility.
+- Create a mobile layout for incident reviews on the go.
+- Add bookmarks for &quot;SRE view&quot;, &quot;FinOps view&quot;, and &quot;Leadership view&quot;.
+- Add a tooltip page that explains the KPI definitions in business language.
+- Add a lightweight usage note so report consumers know which slicers to use first.
+
+## Reference assets
+
+- [`resources/fabric-control-tower/README.md`](../resources/fabric-control-tower/README.md) — semantic model measures and suggested report pages
+- [`resources/fabric-control-tower/src/setup/semantic_model.json`](../resources/fabric-control-tower/src/setup/semantic_model.json) — actual provided semantic model definition
+- [`docs/architecture.md`](../docs/architecture.md) — Gold tables, Core KPIs, and Direct Lake role in the architecture
+- [`challenges/challenge-04-medallion-pipeline.md`](../challenges/challenge-04-medallion-pipeline.md) — prerequisite Gold pipeline
+- [`challenges/challenge-06-operationalize.md`](../challenges/challenge-06-operationalize.md) — next operationalization stretch
+
+Bring this guide to the final showcase rehearsal; Challenge 5 is where the story either lands or
+exposes model gaps that must be fixed before operationalization.</code></pre>
 
         </article>
         
