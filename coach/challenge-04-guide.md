@@ -38,7 +38,8 @@ pipelines are already imported from [`resources/fabric-control-tower/`](../resou
 | 1 | `01_bronze_ingestion.ipynb` | Bronze | Raw shortcut files become `bronze_*` Delta tables with lineage and quality checks |
 | 2 | `04_cosmos_mirroring_transform.ipynb` | Agent feed | Mirrored conversations/interactions are shaped for agent analytics and late-arriving records |
 | 3 | `02_silver_transformation.ipynb` | Silver | FOCUS cost normalization, 5-minute metrics, parsed logs, flattened metadata |
-| 4 | `03_gold_aggregation.ipynb` | Gold | Aggregated Gold data products for cost, operations, capacity, inventory, and dimensions |
+| 4 | `03_gold_aggregation.ipynb` | Gold | Aggregated Gold data products for cost, operations, and resource inventory |
+| 5 | `05_semantic_model_dimensions.ipynb` | Model prep | Physical `dim_date` and `dim_resource` tables for Direct Lake |
 
 The attendee guide frames the main path as Bronze → Silver → Gold. In the reference assets, the Cosmos
 mirroring transform can run after Bronze and contributes the agent analytics product; coach teams to
@@ -51,7 +52,7 @@ For the checkpoint, require the **Load E2E Pipeline**:
 
 - Pipeline file: [`pipeline_load_e2e.json`](../resources/fabric-control-tower/fabric/pipelines/pipeline_load_e2e.json)
 - Activities: Bronze Ingestion → Silver Transformation → Gold Aggregation, plus Cosmos Mirroring
-  Transform after Bronze.
+  Transform after Bronze, followed by Semantic Model Dimensions after both Gold paths succeed.
 - Parameters: `FromMonth` defaults to `-3`; `ToMonth` defaults to `0`.
 - Policy: notebook activities have retries and dependency conditions.
 
@@ -74,7 +75,6 @@ Match the table list in [`docs/architecture.md`](../docs/architecture.md#the-gol
 - `gold_cost_summary`
 - `gold_operational_metrics`
 - `gold_agent_analytics`
-- `gold_capacity_usage`
 - `gold_resource_inventory` (SCD Type 2)
 - `dim_date`
 - `dim_resource`
@@ -85,8 +85,8 @@ checkpoint.
 ## Sample correlation query
 
 Use this as a coaching pattern, not a hard contract. Teams may need to adapt the tag expression to how
-their `metadata` export represents tags. The agent namespace should follow the architecture pattern:
-`<organization>.<domain>.<agent-name>.<version>`.
+their `metadata` export represents tags. `gold_agent_analytics` identifies the agent by `model_name`,
+so the tag predicate has to match on whatever identifier their Challenge 2 tags actually carry.
 
 ```sql
 WITH current_resources AS (
@@ -94,11 +94,11 @@ WITH current_resources AS (
   FROM gold_resource_inventory
   WHERE is_current = true
 ), agent_usage AS (
-  SELECT agent_id, interaction_date, total_tokens, conversation_count, avg_response_time_ms
+  SELECT model_name, interaction_date, total_tokens, conversation_count, avg_response_time_ms
   FROM gold_agent_analytics
 )
 SELECT
-  a.agent_id AS agent_namespace,
+  a.model_name,
   c.cost_year,
   c.cost_month,
   c.service_name,
@@ -110,8 +110,8 @@ FROM gold_cost_summary c
 JOIN current_resources r
   ON c.region = r.region
 JOIN agent_usage a
-  ON r.tags LIKE CONCAT('%', a.agent_id, '%')
-GROUP BY a.agent_id, c.cost_year, c.cost_month, c.service_name
+  ON r.tags LIKE CONCAT('%', a.model_name, '%')
+GROUP BY a.model_name, c.cost_year, c.cost_month, c.service_name
 ORDER BY monthly_cost DESC;
 ```
 

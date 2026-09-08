@@ -1,5 +1,5 @@
 {
-  "total": 62,
+  "total": 63,
   "groups": [
     {
       "id": "agent-workload",
@@ -126,7 +126,7 @@
         "Power BI"
       ],
       "readme": "resources/fabric-control-tower/README.html",
-      "count": 15,
+      "count": 16,
       "files": [
         {
           "path": "resources/fabric-control-tower/.github/workflows/deploy.yml",
@@ -155,6 +155,10 @@
         {
           "path": "resources/fabric-control-tower/fabric/notebooks/04_cosmos_mirroring_transform.ipynb",
           "name": "fabric/notebooks/04_cosmos_mirroring_transform.ipynb"
+        },
+        {
+          "path": "resources/fabric-control-tower/fabric/notebooks/05_semantic_model_dimensions.ipynb",
+          "name": "fabric/notebooks/05_semantic_model_dimensions.ipynb"
         },
         {
           "path": "resources/fabric-control-tower/fabric/pipelines/pipeline_daily_refresh.json",

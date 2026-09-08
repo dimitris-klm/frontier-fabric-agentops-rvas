@@ -131,7 +131,13 @@ pipelines are already imported from <a href="../resources/fabric-control-tower/R
 <td>4</td>
 <td><code>03_gold_aggregation.ipynb</code></td>
 <td>Gold</td>
-<td>Aggregated Gold data products for cost, operations, capacity, inventory, and dimensions</td>
+<td>Aggregated Gold data products for cost, operations, and resource inventory</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>05_semantic_model_dimensions.ipynb</code></td>
+<td>Model prep</td>
+<td>Physical <code>dim_date</code> and <code>dim_resource</code> tables for Direct Lake</td>
 </tr>
 </tbody></table></div>
 <p>The attendee guide frames the main path as Bronze → Silver → Gold. In the reference assets, the Cosmos
@@ -143,7 +149,7 @@ For the checkpoint, require the <strong>Load E2E Pipeline</strong>:</p>
 <ul>
 <li>Pipeline file: <a href="../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fpipelines%2Fpipeline_load_e2e.json"><code>pipeline_load_e2e.json</code></a></li>
 <li>Activities: Bronze Ingestion → Silver Transformation → Gold Aggregation, plus Cosmos Mirroring
-Transform after Bronze.</li>
+Transform after Bronze, followed by Semantic Model Dimensions after both Gold paths succeed.</li>
 <li>Parameters: <code>FromMonth</code> defaults to <code>-3</code>; <code>ToMonth</code> defaults to <code>0</code>.</li>
 <li>Policy: notebook activities have retries and dependency conditions.</li>
 </ul>
@@ -166,7 +172,6 @@ upstream notebook failure and muddies the diagnosis.</p>
 <li><code>gold_cost_summary</code></li>
 <li><code>gold_operational_metrics</code></li>
 <li><code>gold_agent_analytics</code></li>
-<li><code>gold_capacity_usage</code></li>
 <li><code>gold_resource_inventory</code> (SCD Type 2)</li>
 <li><code>dim_date</code></li>
 <li><code>dim_resource</code></li>
@@ -175,18 +180,18 @@ upstream notebook failure and muddies the diagnosis.</p>
 checkpoint.</p>
 <h2 id="sample-correlation-query">Sample correlation query<a class="anchor" href="#sample-correlation-query" aria-hidden="true">#</a></h2>
 <p>Use this as a coaching pattern, not a hard contract. Teams may need to adapt the tag expression to how
-their <code>metadata</code> export represents tags. The agent namespace should follow the architecture pattern:
-<code>&lt;organization&gt;.&lt;domain&gt;.&lt;agent-name&gt;.&lt;version&gt;</code>.</p>
+their <code>metadata</code> export represents tags. <code>gold_agent_analytics</code> identifies the agent by <code>model_name</code>,
+so the tag predicate has to match on whatever identifier their Challenge 2 tags actually carry.</p>
 <pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-sql">WITH current_resources AS (
   SELECT resource_id, resource_group, region, tags
   FROM gold_resource_inventory
   WHERE is_current = true
 ), agent_usage AS (
-  SELECT agent_id, interaction_date, total_tokens, conversation_count, avg_response_time_ms
+  SELECT model_name, interaction_date, total_tokens, conversation_count, avg_response_time_ms
   FROM gold_agent_analytics
 )
 SELECT
-  a.agent_id AS agent_namespace,
+  a.model_name,
   c.cost_year,
   c.cost_month,
   c.service_name,
@@ -198,8 +203,8 @@ FROM gold_cost_summary c
 JOIN current_resources r
   ON c.region = r.region
 JOIN agent_usage a
-  ON r.tags LIKE CONCAT(&#39;%&#39;, a.agent_id, &#39;%&#39;)
-GROUP BY a.agent_id, c.cost_year, c.cost_month, c.service_name
+  ON r.tags LIKE CONCAT(&#39;%&#39;, a.model_name, &#39;%&#39;)
+GROUP BY a.model_name, c.cost_year, c.cost_month, c.service_name
 ORDER BY monthly_cost DESC;</code></pre>
 <p>A second acceptable proof is operational: join <code>gold_operational_metrics</code> and <code>gold_cost_summary</code> by
 service/time to show error rate or P95 latency beside cost.</p>

@@ -190,12 +190,18 @@ Creates analytical aggregates consumed by the semantic model.
 | Table | Description |
 |---|---|
 | `gold_cost_summary` | Daily/monthly cost aggregates by subscription, resource group, service, and tag |
-| `gold_capacity_usage` | Hourly capacity utilization (CPU, memory, DTU) with percentile bands |
 | `gold_operational_metrics` | Error rates, latency percentiles (p50/p95/p99), availability per service |
 | `gold_resource_inventory` | Current and historical resource state with SCD Type 2 tracking |
-| `gold_agent_analytics` | Conversation counts, token usage, response times, satisfaction scores |
-| `dim_date` | Standard date dimension (fiscal calendar, holidays, working days) |
-| `dim_resource` | Conformed resource dimension with hierarchy (subscription → resource group → resource) |
+| `gold_agent_analytics` | Conversation counts, token usage, and response times by model and topic |
+
+### 05_semantic_model_dimensions.ipynb
+
+Creates the physical Direct Lake dimensions after notebooks 03 and 04 have populated the Gold layer.
+
+| Table | Description |
+|---|---|
+| `dim_date` | Continuous calendar spanning the dates present in the four Gold data products |
+| `dim_resource` | One current, deduplicated row per resource derived from `gold_resource_inventory` |
 
 ### 04_cosmos_mirroring_transform.ipynb
 
@@ -208,7 +214,7 @@ Key behaviors:
 
 - Sessionizes messages into conversation threads.
 - Calculates per-conversation metrics: message count, total tokens, elapsed time, resolution status.
-- Joins feedback scores and computes rolling satisfaction averages.
+- Aggregates conversations, interactions, token usage, and response time by model and topic.
 - Handles late-arriving mirrored records with merge-on-read reconciliation.
 
 ## Pipeline Schedule
@@ -220,7 +226,7 @@ Key behaviors:
 
 Both pipelines include:
 
-- Dependency ordering: Bronze → Silver → Gold → Semantic Model refresh.
+- Dependency ordering: Bronze → Silver → Gold plus mirrored-agent transform → semantic-model dimensions.
 - Retry policy: 2 retries with 5-minute backoff.
 - Failure notifications via Fabric alerts (email and Teams webhook).
 
@@ -306,7 +312,8 @@ fabric-control-tower/
 │   │   ├── 01_bronze_ingestion.ipynb
 │   │   ├── 02_silver_transformation.ipynb
 │   │   ├── 03_gold_aggregation.ipynb
-│   │   └── 04_cosmos_mirroring_transform.ipynb
+│   │   ├── 04_cosmos_mirroring_transform.ipynb
+│   │   └── 05_semantic_model_dimensions.ipynb
 │   └── pipelines/
 │       ├── pipeline_load_e2e.json
 │       └── pipeline_daily_refresh.json
