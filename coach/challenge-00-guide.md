@@ -41,8 +41,8 @@ Most of this is verification. Drive it briskly.
    done
    ```
 
-3. **Foundry quota** — in the **Azure AI Foundry portal → Quotas**, confirm `gpt-4o-mini` (or
-   `gpt-4o`) TPM in the chosen region. Lock in one region for the whole team.
+3. **Foundry quota** — in the **Azure AI Foundry portal → Quotas**, confirm at least 30K TPM for
+   `gpt-5-mini` in the chosen region. Lock in one region for the whole team.
 
 4. **Fabric capacity + workspace**
    - Trial: [app.fabric.microsoft.com](https://app.fabric.microsoft.com) → Account manager → **Start
@@ -50,9 +50,9 @@ Most of this is verification. Drive it briskly.
    - Create a workspace per team; set License mode to **Trial** (or **Fabric capacity** + F-SKU).
    - Share the capacity by assigning each team's workspace to it.
 
-5. **Tooling** — verify on each machine:
+5. **Tooling** — verify on each machine, including a running Docker engine:
    ```bash
-   az version && azd version && python --version && node --version && docker --version && git --version
+   az version && azd version && python --version && node --version && docker info && git --version
    ```
 
 6. **Clone + tour** `resources/`.
@@ -77,6 +77,7 @@ Ask the team to:
 | Fabric **tenant setting** disabled (can't create workspaces / Mirroring) | Get the Fabric admin to enable it (see prerequisites) — this is a tenant-admin action, plan ahead |
 | Trial **F64 option not offered** | F4 is fine for the RVAS; or use a paid F2+; eligibility for F64 varies |
 | Corporate **egress restrictions** block PyPI/npm/MCR or `*.fabric.microsoft.com` | Use Azure Cloud Shell for CLI; raise a firewall exception |
+| `azd provision` says the container runtime is not running | Start Docker Desktop and wait for `docker info` to succeed. With the current `azure.yaml`, `azd` checks Docker even when running only the provisioning phase |
 
 ## Talking points (mini-briefing)
 

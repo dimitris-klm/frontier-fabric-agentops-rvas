@@ -82,7 +82,7 @@ registries (PyPI, npm, MCR/Docker Hub). Azure Cloud Shell is a good fallback for
 One is enough. Multiple is fully supported and realistic — e.g., workload in one subscription, cost
 exports scoped at the billing account. Record your subscription IDs in Challenge 0.</p>
 <p><strong>Which region should we use?</strong>
-One that offers <strong>both</strong> your chosen model (<code>gpt-4o</code> / <code>gpt-4o-mini</code>) <strong>and</strong> Microsoft Fabric. East
+One that offers <strong>both</strong> the reference model (<code>gpt-5-mini</code>) <strong>and</strong> Microsoft Fabric. East
 US 2, West US 3, and Sweden Central are safe defaults. Keep all resources in one region to avoid
 egress charges with OneLake shortcuts.</p>
 <p><strong>What happens when the Fabric trial expires?</strong>
@@ -145,7 +145,7 @@ Yes. ADLS Gen2 and OneLake encrypt at rest (Microsoft-managed keys by default; c
 available). Cosmos DB is encrypted at rest. All traffic uses TLS 1.2+.</p>
 <p><strong>What will this cost us?</strong>
 Low for an RVAS: Fabric is free on trial; the agent workload runs a few dollars/day with
-<code>gpt-4o-mini</code>, serverless Cosmos DB, and scale-to-low Container Apps (APIM Developer tier is the main
+<code>gpt-5-mini</code>, serverless Cosmos DB, and scale-to-low Container Apps (APIM Developer tier is the main
 fixed cost); the landing zone is inexpensive. <strong>Tear everything down</strong> with <code>azd down --purge</code> and
 end the Fabric trial / delete the workspace when finished.</p>
 <p><strong>Can we pause Fabric to save money?</strong>

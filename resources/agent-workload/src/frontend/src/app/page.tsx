@@ -18,14 +18,23 @@ interface Message {
   timestamp: Date;
 }
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [apiUrl, setApiUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((response) => {
+        if (!response.ok) throw new Error("Failed to load application configuration");
+        return response.json();
+      })
+      .then((config: { apiUrl: string }) => setApiUrl(config.apiUrl))
+      .catch(() => setApiUrl("http://localhost:8000"));
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -35,6 +44,7 @@ export default function ChatPage() {
     const response = await fetch(`${apiUrl}/api/conversations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "New Conversation" }),
     });
     if (!response.ok) {
       throw new Error("Failed to create conversation");
@@ -80,7 +90,7 @@ export default function ChatPage() {
       const data = await response.json();
       const assistantMessage: Message = {
         role: "assistant",
-        content: data.content || data.message || JSON.stringify(data),
+        content: data.assistantMessage.content,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMessage]);

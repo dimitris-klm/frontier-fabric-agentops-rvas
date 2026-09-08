@@ -44,8 +44,8 @@ By the end of this challenge you will have:
 
 ### 2. Confirm your firepower (Foundry model quota)
 
-- Confirm access to **Azure AI Foundry / Azure OpenAI** and locate **quota** for `gpt-4o` or
-  `gpt-4o-mini`.
+- Confirm access to **Azure AI Foundry / Azure OpenAI** and locate **quota** for `gpt-5-mini`, the
+  model used by the reference workload.
 - Pick a **region** that offers both the model and Microsoft Fabric, and agree on it as a team —
   you'll deploy everything there.
 
@@ -59,7 +59,8 @@ By the end of this challenge you will have:
 
 ### 4. Arm the team (tooling) & get the code
 
-- Install and verify the local tools (`az`, `azd`, `python`, `node`, `docker`, `git`).
+- Install and verify the local tools (`az`, `azd`, `python`, `node`, `docker`, `git`). Start Docker
+  Desktop (or another compatible container runtime) and confirm its engine is running.
 - Clone this repo and take a 5-minute tour of `resources/` — note where the agent workload, landing
   zone, and Fabric assets live. You'll come back to each.
 
@@ -77,10 +78,10 @@ You're ready to advance when:
 
 - [ ] Every team member can `az login` and select the target subscription
 - [ ] Roles confirmed: Contributor (+ someone with role-assignment rights), Cost Management Reader
-- [ ] Foundry model quota confirmed for `gpt-4o`/`gpt-4o-mini` in your chosen region
+- [ ] Foundry model quota confirmed for `gpt-5-mini` in your chosen region
 - [ ] A Fabric capacity is active and you know its ID/name
 - [ ] A team **Fabric workspace** exists, assigned to the capacity, reachable by all members
-- [ ] Local tooling installed and verified (`az version`, `azd version`, `python --version`, `docker --version`)
+- [ ] Local tooling installed and verified (`az version`, `azd version`, `python --version`, `docker info`)
 - [ ] Repo cloned; team has located the four `resources/` components
 - [ ] Your "coordinates" (subscription, region, capacity, workspace) are written down
 
@@ -126,7 +127,8 @@ az role assignment list --assignee "$(az account show --query user.name -o tsv)"
 <summary>Checking Foundry / OpenAI quota</summary>
 
 In the **Azure AI Foundry portal → Management → Quotas**, filter to your region and confirm available
-TPM for `gpt-4o-mini` (recommended) or `gpt-4o`. ~30K TPM per team is plenty.
+TPM for `gpt-5-mini`. The reference deployment requests 30K TPM; confirm that capacity is available
+in the team's chosen region.
 </details>
 
 ## Resources

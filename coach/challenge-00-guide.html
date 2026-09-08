@@ -105,8 +105,8 @@ az account show -o table</code></pre>
   az provider register --namespace &quot;$p&quot;
 done</code></pre>
 </li>
-<li><p><strong>Foundry quota</strong> — in the <strong>Azure AI Foundry portal → Quotas</strong>, confirm <code>gpt-4o-mini</code> (or
-<code>gpt-4o</code>) TPM in the chosen region. Lock in one region for the whole team.</p>
+<li><p><strong>Foundry quota</strong> — in the <strong>Azure AI Foundry portal → Quotas</strong>, confirm at least 30K TPM for
+<code>gpt-5-mini</code> in the chosen region. Lock in one region for the whole team.</p>
 </li>
 <li><p><strong>Fabric capacity + workspace</strong></p>
 <ul>
@@ -116,8 +116,8 @@ trial</strong>. The starter becomes capacity admin.</li>
 <li>Share the capacity by assigning each team&#39;s workspace to it.</li>
 </ul>
 </li>
-<li><p><strong>Tooling</strong> — verify on each machine:</p>
-<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">az version &amp;&amp; azd version &amp;&amp; python --version &amp;&amp; node --version &amp;&amp; docker --version &amp;&amp; git --version</code></pre>
+<li><p><strong>Tooling</strong> — verify on each machine, including a running Docker engine:</p>
+<pre><button class="code-copy" type="button" aria-label="Copy code">Copy</button><code class="language-bash">az version &amp;&amp; azd version &amp;&amp; python --version &amp;&amp; node --version &amp;&amp; docker info &amp;&amp; git --version</code></pre>
 </li>
 <li><p><strong>Clone + tour</strong> <code>resources/</code>.</p>
 </li>
@@ -158,6 +158,10 @@ trial</strong>. The starter becomes capacity admin.</li>
 <tr>
 <td>Corporate <strong>egress restrictions</strong> block PyPI/npm/MCR or <code>*.fabric.microsoft.com</code></td>
 <td>Use Azure Cloud Shell for CLI; raise a firewall exception</td>
+</tr>
+<tr>
+<td><code>azd provision</code> says the container runtime is not running</td>
+<td>Start Docker Desktop and wait for <code>docker info</code> to succeed. With the current <code>azure.yaml</code>, <code>azd</code> checks Docker even when running only the provisioning phase</td>
 </tr>
 </tbody></table></div>
 <h2 id="talking-points-mini-briefing">Talking points (mini-briefing)<a class="anchor" href="#talking-points-mini-briefing" aria-hidden="true">#</a></h2>

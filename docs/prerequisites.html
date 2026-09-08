@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Prerequisites &amp; Environment Setup · Frontier Fabric AgentOps RVAS</title>
-  <meta name="description" content="Work through this checklist with your coach before Day 1. The RVAS runs on the customer&#39;s
-own environment — your Azure subscription(s) plus a Microsoft Fabric capacity. Getting acc">
+  <meta name="description" content="Prerequisites &amp; Environment Setup">
   <link rel="icon" type="image/png" href="../assets/logos/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -110,14 +109,13 @@ account / management group. Note your subscription IDs in Challenge 0.</p>
 <ul>
 <li>Access to <strong>Azure AI Foundry</strong> (Azure OpenAI) in your tenant. If your subscription has never used
 it, request access / confirm it is enabled.</li>
-<li><strong>Model quota</strong> for <code>gpt-4o</code> <strong>or</strong> <code>gpt-4o-mini</code> (the agent defaults to <code>gpt-4o</code>; <code>gpt-4o-mini</code>
-is cheaper and recommended for the RVAS) in your chosen region.</li>
+<li><strong>Model quota</strong> for <code>gpt-5-mini</code>, the reference workload&#39;s default model, in your chosen region.</li>
 <li>A <strong>region</strong> that offers both the model and Microsoft Fabric. Good defaults: <strong>East US 2</strong>,
 <strong>West US 3</strong>, <strong>Sweden Central</strong>. Verify model availability for your region in the Foundry portal.</li>
 </ul>
 <blockquote>
 <p>🔎 Check quota in the <strong>Azure AI Foundry portal → Quotas</strong>, or with the <code>azure-quotas</code> tooling.
-30K–50K TPM of <code>gpt-4o-mini</code> is plenty for a team.</p>
+The reference deployment requests 30K TPM of <code>gpt-5-mini</code> per team.</p>
 </blockquote>
 <h2 id="3-microsoft-fabric-capacity">3. Microsoft Fabric capacity<a class="anchor" href="#3-microsoft-fabric-capacity" aria-hidden="true">#</a></h2>
 <p>The Control Tower runs on <strong>Microsoft Fabric</strong>. You have two options:</p>
@@ -196,7 +194,7 @@ Docker Hub / MCR). If the customer network restricts egress, flag it to your coa
 <tr>
 <td><strong>Docker</strong></td>
 <td>latest</td>
-<td><a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener">https://www.docker.com/products/docker-desktop/</a> (build agent images)</td>
+<td><a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener">https://www.docker.com/products/docker-desktop/</a> (start the engine before running <code>azd</code>)</td>
 </tr>
 <tr>
 <td><strong>Git</strong></td>
@@ -214,13 +212,13 @@ Docker Hub / MCR). If the customer network restricts egress, flag it to your coa
 azd version
 python --version
 node --version
-docker --version
+docker info
 git --version</code></pre>
 <h2 id="7-cost-expectations-hygiene">7. Cost expectations &amp; hygiene<a class="anchor" href="#7-cost-expectations-hygiene" aria-hidden="true">#</a></h2>
 <p>This RVAS is intentionally low-cost, but <strong>clean up when you&#39;re done</strong>.</p>
 <ul>
 <li><strong>Fabric</strong> — free on trial; pause paid capacity outside hours. OneLake storage is a few cents/GB.</li>
-<li><strong>Agent workload</strong> — serverless Cosmos DB, Container Apps scale-to-low, and <code>gpt-4o-mini</code> keep
+<li><strong>Agent workload</strong> — serverless Cosmos DB, Container Apps autoscaling, and <code>gpt-5-mini</code> keep
 spend to a few dollars/day. APIM <strong>Developer</strong> tier (used here) is the main fixed cost.</li>
 <li><strong>Landing zone</strong> — ADLS Gen2 + Log Analytics are inexpensive at RVAS volumes.</li>
 <li><strong>Tear down</strong> with <code>azd down --purge</code> in each workload directory when the event ends (Challenge 0
@@ -236,7 +234,7 @@ cd frontier-fabric-agentops-rvas</code></pre>
 <li><input disabled="" type="checkbox"> Each member can <code>az login</code> to the target subscription</li>
 <li><input disabled="" type="checkbox"> Roles confirmed: Contributor (+ User Access Administrator), Cost Management Reader</li>
 <li><input disabled="" type="checkbox"> Resource providers registered: <code>Microsoft.App</code>, <code>Microsoft.DocumentDB</code>, <code>Microsoft.ApiManagement</code>, <code>Microsoft.CognitiveServices</code>, <code>Microsoft.OperationalInsights</code>, <code>Microsoft.Storage</code></li>
-<li><input disabled="" type="checkbox"> Azure OpenAI / Foundry access confirmed with quota for <code>gpt-4o</code> or <code>gpt-4o-mini</code> in your region</li>
+<li><input disabled="" type="checkbox"> Azure OpenAI / Foundry access confirmed with quota for <code>gpt-5-mini</code> in your region</li>
 <li><input disabled="" type="checkbox"> Region chosen that supports both the model <strong>and</strong> Fabric (e.g., East US 2)</li>
 <li><input disabled="" type="checkbox"> Fabric trial started (or paid F2+ capacity created) and you know your <strong>capacity ID / name</strong></li>
 <li><input disabled="" type="checkbox"> Fabric tenant settings allow workspace creation + Mirroring</li>
