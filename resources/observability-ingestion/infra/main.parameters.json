@@ -8,8 +8,11 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
-    "exportScope": {
-      "value": "${AZURE_SUBSCRIPTION_ID}"
+    "logAnalyticsWorkspaceName": {
+      "value": "${AZURE_LOG_ANALYTICS_WORKSPACE_NAME}"
+    },
+    "fabricWorkspaceIdentityPrincipalId": {
+      "value": "${FABRIC_WORKSPACE_IDENTITY_PRINCIPAL_ID}"
     }
   }
 }

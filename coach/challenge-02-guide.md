@@ -8,20 +8,39 @@
 |---|---|
 | **Est. time** | 1.5–2 h |
 | **Difficulty** | ⭐⭐ (200) |
-| **They build** | ADLS Gen2 landing zone for cost, metrics, logs, metadata, and diagnostics |
+| **They build** | ADLS Gen2 landing zone for cost, metadata, Log Analytics exports, and diagnostics |
 | **Key services** | ADLS Gen2, Azure Cost Management, Resource Graph, Log Analytics data export, Diagnostic Settings |
 
 ## Coaching objectives
 
 This challenge turns scattered Azure signals into a single **landing zone** that Fabric can read with
-OneLake shortcuts. Keep teams focused on the outcome: five domains landing in storage with enough
-proof that Challenge 3 can shortcut to them.
+OneLake shortcuts. Keep teams focused on the outcome: managed `costs` and `metadata` containers plus
+Azure-created `am-*` and `insights-*` export containers with enough proof that Challenge 3 can
+shortcut to them.
 
-**What good looks like:** the team shows the five containers, validates FOCUS and Resource Graph
-Parquet, confirms the Log Analytics export rule, applies diagnostic settings to supported resources,
-and records the storage account name, resource ID, and DFS endpoint.
+**What good looks like:** the team validates FOCUS and Resource Graph Parquet, shows the physical
+`am-*` and `insights-*` containers created by Azure, confirms the Log Analytics export rule and
+diagnostic setting, and records the storage account name, resource ID, and DFS endpoint.
 
 ## The reference path
+
+Prepare the persistent Fabric identity before deployment:
+
+1. Reuse the team's Challenge 0 Fabric workspace. If it does not exist, create it in the Fabric
+  portal and assign it to the team's Fabric capacity.
+2. Open **Workspace settings** > **Workspace identity** and select **+ Workspace identity**.
+3. Copy the identity **Object ID**, which is the Microsoft Entra principal ID. Do not use the Fabric
+  workspace ID or the identity's client ID.
+4. Store it in the same `azd` environment used by the team:
+
+```bash
+cd resources/observability-ingestion
+azd env select ctl-tower
+azd env set FABRIC_WORKSPACE_IDENTITY_PRINCIPAL_ID <WORKSPACE_IDENTITY_OBJECT_ID>
+```
+
+There is intentionally no preflight automation for this step. Workspace identity creation is an
+explicit workspace-admin action in the Fabric portal.
 
 Deploy the ingestion asset:
 
@@ -31,37 +50,33 @@ azd auth login
 azd up        # env name, region (same as Challenge 0), subscription
 ```
 
-`azd up` provisions ADLS Gen2 storage, five containers, Log Analytics workspace + data export rule,
-Cost Management FOCUS export, Key Vault, and a user-assigned managed identity. Capture outputs:
+`azd provision` creates the ADLS Gen2 landing zone, attaches a data export rule to the existing
+Challenge 1 Log Analytics workspace, configures its diagnostic setting, and creates the Cost
+Management FOCUS export. Capture outputs:
 
 ```bash
 azd env get-values
 ```
 
-Install script dependencies:
+Create an isolated environment for the one-time lab seed:
 
 ```bash
 cd resources/observability-ingestion/src/scripts
-pip install -r requirements.txt
+python -m venv .venv
 ```
 
-Preview diagnostic settings:
+Windows PowerShell:
 
-```bash
-python setup_diagnostic_settings.py \
-  --subscription-id <SUBSCRIPTION_ID> \
-  --workspace-id <WORKSPACE_RESOURCE_ID> \
-  --storage-account-id <STORAGE_ACCOUNT_RESOURCE_ID> \
-  --dry-run
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 ```
 
-Apply diagnostic settings:
+macOS/Linux:
 
 ```bash
-python setup_diagnostic_settings.py \
-  --subscription-id <SUBSCRIPTION_ID> \
-  --workspace-id <WORKSPACE_RESOURCE_ID> \
-  --storage-account-id <STORAGE_ACCOUNT_RESOURCE_ID>
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
 Run Resource Graph export:
@@ -103,15 +118,18 @@ python validate_exports.py \
 
 Ask the team to show:
 
-1. **Storage account** with hierarchical namespace enabled and containers:
-   `costs`, `metrics`, `logs`, `metadata`, `diagnostics`.
+1. **Storage account** with hierarchical namespace enabled and managed containers `costs` and
+  `metadata`.
 2. **FOCUS cost Parquet** under `costs/focus/...` after trigger/wait.
 3. **Resource Graph Parquet** under `metadata/resource-graph/year=*/month=*/day=*/`.
 4. **Log Analytics data export** enabled for `AppRequests`, `AppDependencies`, `AppTraces`,
    `AppExceptions`, and `AppMetrics`.
-5. **Diagnostic settings** created on supported resources; unsupported types skipped gracefully.
-6. `validate_exports.py` output with file counts, sizes, latest timestamps, and sample schemas.
-7. Recorded Fabric coordinates:
+5. Azure-created **Log Analytics containers** such as `am-apprequests`, `am-appdependencies`, and
+  `am-appmetrics` after fresh Challenge 1 traffic.
+6. Azure-created **diagnostic containers** with `insights-*` names after platform telemetry is emitted.
+7. **Diagnostic setting** on the reused Log Analytics workspace targets storage and Log Analytics.
+8. `validate_exports.py` output with file counts, sizes, latest timestamps, and sample schemas.
+9. Recorded Fabric coordinates:
    - storage account name
    - storage account resource ID
    - `https://<storage-account>.dfs.core.windows.net`
@@ -123,14 +141,16 @@ shortcut to it.
 
 | Pitfall | Fix |
 |---|---|
+| `FABRIC_WORKSPACE_IDENTITY_PRINCIPAL_ID` is missing | Create the identity under **Workspace settings** > **Workspace identity**, copy its **Object ID**, and store it with `azd env set` |
+| Storage role assignment targets the wrong ID | Use the workspace identity **Object ID**, not the Fabric workspace ID or managed identity client ID |
 | Missing **Cost Management Reader** | Grant at the billing/subscription scope; Contributor on the resource group is not enough for cost exports |
 | `costs` container empty | Cost export is daily; trigger it manually with the ARM `run` action and wait for execution to complete |
 | Cost export name unknown | It is `export-<environmentName>-focus-daily` from `infra/main.bicep`; confirm with `az costmanagement export list --scope /subscriptions/<id>` |
 | Expecting Log Analytics export to backfill | Data export is continuous from enablement forward; generate Challenge 1 traffic after enabling it |
 | Assuming data export requires a dedicated cluster | It does not for this reference path; verify the rule is enabled and treat it as continuous export |
-| Diagnostic settings fail on some resources | Normal. The script skips known unsupported types and logs warnings for resources without categories |
 | Storage access denied from scripts | Ensure the caller/identity has Storage Blob Data Contributor on the storage account or resource group |
-| No metrics/log files yet | Confirm the data export rule is enabled, traffic exists in the workspace, and allow time for export latency |
+| Expected `am-*` container is absent | Confirm the data export rule is enabled, generate fresh Challenge 1 traffic, and allow time for export latency; data export does not backfill |
+| Expected `insights-*` container is absent | Confirm the diagnostic setting is enabled and wait for the corresponding platform log or metric category to emit data |
 
 ## Talking points (mini-briefing)
 
@@ -140,8 +160,8 @@ shortcut to it.
   queryable together instead of trapped in separate portals.
 - **Date partitions are Spark fuel.** The storage layout is already shaped for Fabric notebooks and
   medallion processing.
-- **Continuous vs batch matters.** Log Analytics and diagnostics stream continuously; cost and
-  Resource Graph are scheduled/triggered snapshots.
+- **Continuous vs batch matters.** Log Analytics and diagnostics stream continuously; cost is a
+  scheduled Azure export; Resource Graph is seeded once for the workshop.
 - **This is Challenge 3's shortcut target.** The storage DFS endpoint is the bridge into OneLake with
   no data copy.
 
@@ -149,7 +169,7 @@ shortcut to it.
 
 - Add tags (`team`, `agent`, `environment`, `costCenter`) to Challenge 1 resources, rerun Resource
   Graph export, and prove tags appear in Parquet.
-- Generate more agent traffic and watch the `metrics` / `logs` containers grow.
+- Generate more agent traffic and watch the relevant `am-*` containers grow.
 - Compare `ResourceId` in FOCUS with `id` in Resource Graph and sketch the future `dim_resource` join.
 - Review [`docs/architecture.md`](../docs/architecture.md) Gold tables and map which raw container
   feeds each one.
@@ -158,8 +178,8 @@ shortcut to it.
 
 - [`resources/observability-ingestion/README.md`](../resources/observability-ingestion/README.md) — deployment, data layout, script usage
 - [`resources/observability-ingestion/infra/main.bicep`](../resources/observability-ingestion/infra/main.bicep) — outputs and resource naming
-- [`resources/observability-ingestion/infra/modules/storage.bicep`](../resources/observability-ingestion/infra/modules/storage.bicep) — five containers and ADLS Gen2 settings
+- [`resources/observability-ingestion/infra/modules/storage.bicep`](../resources/observability-ingestion/infra/modules/storage.bicep) — managed containers and ADLS Gen2 settings
 - [`resources/observability-ingestion/infra/modules/monitoring.bicep`](../resources/observability-ingestion/infra/modules/monitoring.bicep) — Log Analytics data export tables
 - [`resources/observability-ingestion/infra/modules/cost-export.bicep`](../resources/observability-ingestion/infra/modules/cost-export.bicep) — FOCUS Parquet export
-- [`resources/observability-ingestion/src/scripts/`](../resources/observability-ingestion/src/scripts/) — Resource Graph, diagnostic settings, validation
+- [`resources/observability-ingestion/src/scripts/`](../resources/observability-ingestion/src/scripts/) — Resource Graph export and validation
 - [`docs/architecture.md`](../docs/architecture.md) — Ingest stage and Gold data products

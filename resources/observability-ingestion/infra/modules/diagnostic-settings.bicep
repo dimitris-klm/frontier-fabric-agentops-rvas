@@ -24,20 +24,12 @@ resource diagnosticSetting 'Microsoft.Insights/diagnosticSettings@2021-05-01-pre
       {
         categoryGroup: 'allLogs'
         enabled: true
-        retentionPolicy: {
-          enabled: true
-          days: 90
-        }
       }
     ]
     metrics: [
       {
         category: 'AllMetrics'
         enabled: true
-        retentionPolicy: {
-          enabled: true
-          days: 90
-        }
       }
     ]
   }

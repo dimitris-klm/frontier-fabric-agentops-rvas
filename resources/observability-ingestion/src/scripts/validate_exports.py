@@ -1,9 +1,8 @@
-"""Validate export data in ADLS Gen2 storage containers.
+"""Validate export data in an ADLS Gen2 observability landing zone.
 
-Connects to an ADLS Gen2 storage account and reports on the files
-present in each observability container (costs, metrics, logs, metadata,
-diagnostics). Shows file count, total size, latest timestamp, and a
-sample Parquet schema when available.
+Reports on the managed costs and metadata containers plus physical
+containers created by Log Analytics data export (am-*) and diagnostic
+settings (insights-*).
 """
 
 import argparse
@@ -17,9 +16,20 @@ from azure.storage.filedatalake import DataLakeServiceClient
 from rich.console import Console
 from rich.table import Table
 
-CONTAINERS = ["costs", "metrics", "logs", "metadata", "diagnostics"]
+MANAGED_CONTAINERS = ["costs", "metadata"]
+AZURE_EXPORT_PREFIXES = ("am-", "insights-")
 
 console = Console()
+
+
+def discover_containers(service_client: DataLakeServiceClient) -> list[str]:
+    """Return managed containers and physical containers created by Azure exports."""
+    discovered = {
+        file_system.name
+        for file_system in service_client.list_file_systems()
+        if file_system.name.startswith(AZURE_EXPORT_PREFIXES)
+    }
+    return MANAGED_CONTAINERS + sorted(discovered)
 
 
 def sizeof_fmt(num_bytes: float) -> str:
@@ -128,8 +138,10 @@ def main() -> None:
     parser.add_argument(
         "--containers",
         nargs="*",
-        default=CONTAINERS,
-        help="Containers to validate (default: all).",
+        help=(
+            "Physical containers to validate. By default, discovers costs, metadata, "
+            "Log Analytics am-* containers, and diagnostic settings insights-* containers."
+        ),
     )
     args = parser.parse_args()
 
@@ -139,6 +151,7 @@ def main() -> None:
         account_url=account_url,
         credential=credential,
     )
+    containers = args.containers or discover_containers(service_client)
 
     console.print()
     console.rule("[bold blue]ADLS Gen2 Export Validation Report")
@@ -156,8 +169,10 @@ def main() -> None:
     table.add_column("Last Modified", style="yellow")
     table.add_column("Sample Schema", style="dim", max_width=60)
 
-    for container in args.containers:
+    results = []
+    for container in containers:
         result = validate_container(service_client, container)
+        results.append(result)
         table.add_row(
             result["container"],
             str(result["file_count"]),
@@ -170,15 +185,12 @@ def main() -> None:
     console.print(table)
     console.print()
 
-    total_files = 0
-    for container in args.containers:
-        files = list_files_recursive(service_client, container)
-        total_files += len(files)
+    total_files = sum(result["file_count"] for result in results)
 
     if total_files > 0:
         console.print(
             f"[bold green]✓[/] Data landing zone is active with "
-            f"{total_files} total files across {len(args.containers)} containers."
+            f"{total_files} total files across {len(containers)} containers."
         )
     else:
         console.print(
