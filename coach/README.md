@@ -78,8 +78,8 @@ fast-forward a team through Challenges 1–2 (Azure foundation) so they reach th
   each team's workspace to it. Give each team **its own workspace**.
 - **Naming.** Agree a convention up front, e.g. `rg-agentops-<team>` and workspace `AgentOps-<team>`,
   so resources are easy to find and clean up.
-- **Cost.** Low by design (see [FAQ](../docs/faq.md)). Use `gpt-4o-mini`. Pause paid capacity
-  overnight.
+- **Cost.** Low by design (see [FAQ](../docs/faq.md)). The reference deployment uses `gpt-5-mini`.
+  Pause paid capacity overnight.
 - **Cleanup (end of event).** In each workload dir: `azd down --purge`. Delete Fabric workspaces and,
   if you started a trial, let it expire (or end it). Remove cost exports.
 

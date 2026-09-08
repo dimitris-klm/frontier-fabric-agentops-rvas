@@ -31,13 +31,12 @@ The agent needs a chat model. Confirm **before** the event:
 
 - Access to **Azure AI Foundry** (Azure OpenAI) in your tenant. If your subscription has never used
   it, request access / confirm it is enabled.
-- **Model quota** for `gpt-4o` **or** `gpt-4o-mini` (the agent defaults to `gpt-4o`; `gpt-4o-mini`
-  is cheaper and recommended for the RVAS) in your chosen region.
+- **Model quota** for `gpt-5-mini`, the reference workload's default model, in your chosen region.
 - A **region** that offers both the model and Microsoft Fabric. Good defaults: **East US 2**,
   **West US 3**, **Sweden Central**. Verify model availability for your region in the Foundry portal.
 
 > 🔎 Check quota in the **Azure AI Foundry portal → Quotas**, or with the `azure-quotas` tooling.
-> 30K–50K TPM of `gpt-4o-mini` is plenty for a team.
+> The reference deployment requests 30K TPM of `gpt-5-mini` per team.
 
 ## 3. Microsoft Fabric capacity
 
@@ -98,7 +97,7 @@ Install on each team member's machine (or use a shared **Azure Cloud Shell** / d
 | **Azure Developer CLI** (`azd`) | 1.10+ | `curl -fsSL https://aka.ms/install-azd.sh \| bash` |
 | **Python** | 3.11+ | https://www.python.org/ (use a venv) |
 | **Node.js** | 20+ | https://nodejs.org/ (frontend, local dev only) |
-| **Docker** | latest | https://www.docker.com/products/docker-desktop/ (build agent images) |
+| **Docker** | latest | https://www.docker.com/products/docker-desktop/ (start the engine before running `azd`) |
 | **Git** | latest | https://git-scm.com/ |
 | **Power BI Desktop** *(optional)* | latest | https://aka.ms/pbidesktop (Windows only) |
 
@@ -109,7 +108,7 @@ az version
 azd version
 python --version
 node --version
-docker --version
+docker info
 git --version
 ```
 
@@ -118,7 +117,7 @@ git --version
 This RVAS is intentionally low-cost, but **clean up when you're done**.
 
 - **Fabric** — free on trial; pause paid capacity outside hours. OneLake storage is a few cents/GB.
-- **Agent workload** — serverless Cosmos DB, Container Apps scale-to-low, and `gpt-4o-mini` keep
+- **Agent workload** — serverless Cosmos DB, Container Apps autoscaling, and `gpt-5-mini` keep
   spend to a few dollars/day. APIM **Developer** tier (used here) is the main fixed cost.
 - **Landing zone** — ADLS Gen2 + Log Analytics are inexpensive at RVAS volumes.
 - **Tear down** with `azd down --purge` in each workload directory when the event ends (Challenge 0
@@ -140,7 +139,7 @@ Bring this to the kickoff. You're ready when every box is ticked:
 - [ ] Each member can `az login` to the target subscription
 - [ ] Roles confirmed: Contributor (+ User Access Administrator), Cost Management Reader
 - [ ] Resource providers registered: `Microsoft.App`, `Microsoft.DocumentDB`, `Microsoft.ApiManagement`, `Microsoft.CognitiveServices`, `Microsoft.OperationalInsights`, `Microsoft.Storage`
-- [ ] Azure OpenAI / Foundry access confirmed with quota for `gpt-4o` or `gpt-4o-mini` in your region
+- [ ] Azure OpenAI / Foundry access confirmed with quota for `gpt-5-mini` in your region
 - [ ] Region chosen that supports both the model **and** Fabric (e.g., East US 2)
 - [ ] Fabric trial started (or paid F2+ capacity created) and you know your **capacity ID / name**
 - [ ] Fabric tenant settings allow workspace creation + Mirroring

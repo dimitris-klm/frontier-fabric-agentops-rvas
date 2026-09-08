@@ -2,7 +2,7 @@
 
 > **Part of the [Frontier Fabric AgentOps RVAS](../../README.md).** This is the telemetry
 > **source** you deploy in **[Challenge 1](../../challenges/challenge-01-agent-telemetry.md)** — a
-> full-stack Azure AI Foundry agent that emits the traces, custom token/cost metrics, and
+> full-stack Azure AI Foundry agent that emits backend-origin traces, custom token and latency metrics, and
 > conversation data the Control Tower later correlates.
 
 <!-- Badges -->
@@ -11,56 +11,34 @@
 ![Node.js](https://img.shields.io/badge/Node.js-20-green)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-> Full-stack AI agent runtime with end-to-end observability — from user click to model inference.
+> Full-stack AI agent runtime with application observability from the backend to model inference.
 
 ---
 
 ## Architecture Overview
 
-The **Agents Runtime** is the core execution block of the observability platform. It orchestrates user interactions through a gateway, processes requests across three microservices, persists data, and emits telemetry at every layer.
+The **Agents Runtime** is the core execution block of the observability platform. It processes
+requests across three microservices and persists conversation data. Application telemetry begins at
+the backend; the frontend is not instrumented in this reference workload.
 
 | Component | Role |
 |---|---|
-| **Azure AI Foundry** | Provides the AI model endpoint (GPT-4o / GPT-4o-mini) for agent inference via managed deployments. |
+| **Azure AI Foundry** | Provides the `gpt-5-mini` model endpoint for agent inference via a managed deployment. |
 | **Azure Container Apps** | Hosts three microservices — frontend, backend, and agent — in a shared managed environment with built-in autoscaling. |
-| **Azure API Management** | Unified API gateway with PTU-aware load balancing, rate limiting, and centralized analytics. |
+| **Azure API Management** | Provisions API definitions and policies for future gateway integration; it is not in the reference application's active request path. |
 | **Azure Cosmos DB** | Stores conversations, individual interactions, and agent configuration using a serverless throughput model. |
-| **Application Insights** | Full-stack telemetry — distributed traces, live metrics, dependency maps, and custom counters for token usage. |
+| **Application Insights** | Backend and agent request traces, dependency maps, and custom token and latency metrics. |
 
 ### Architecture Diagram
 
-```
-┌──────────┐
-│   User   │
-└────┬─────┘
-     │ HTTPS
-     ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    API Management Gateway                    │
-│            (PTU load balancing · rate limiting)               │
-└────┬─────────────────┬──────────────────┬────────────────────┘
-     │                 │                  │
-     ▼                 ▼                  ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Container Apps Environment                      │
-│                                                              │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐ │
-│  │  Frontend   │  │   Backend    │  │       Agent          │ │
-│  │  (Next.js)  │  │  (FastAPI)   │  │     (FastAPI)        │ │
-│  │  Port 3000  │  │  Port 8000   │  │     Port 8001        │ │
-│  └─────────────┘  └──────┬───────┘  └──────────┬──────────┘ │
-│                          │                      │            │
-│                          ▼                      ▼            │
-│                   ┌────────────┐       ┌─────────────────┐   │
-│                   │ Cosmos DB  │       │ Azure AI Foundry │   │
-│                   │ (agentsdb) │       │  (GPT-4o model)  │   │
-│                   └────────────┘       └─────────────────┘   │
-│                                                              │
-│         ┌──────────────────────────────────┐                 │
-│         │      Application Insights        │                 │
-│         │  (traces · metrics · logs · map) │                 │
-│         └──────────────────────────────────┘                 │
-└──────────────────────────────────────────────────────────────┘
+```text
+User → Frontend (Next.js) → Backend (FastAPI) → Agent (FastAPI) → Azure AI Foundry
+                │
+                └→ Cosmos DB (agentsdb)
+
+Backend + Agent → Application Insights
+
+API Management is provisioned for future gateway integration but is not in this active path.
 ```
 
 ---
@@ -91,6 +69,11 @@ azd init
 azd up
 ```
 
+Docker must be running. `azd up` is the normal path when containers can download packages from npm
+and PyPI. If a restricted network blocks local container package downloads, run `azd provision`,
+build the `agent`, `backend`, and `frontend` images as `latest` with `az acr build`, and attach them
+with new Container Apps revisions. See the Challenge 1 coach guide for the exact fallback commands.
+
 After deployment completes, `azd` prints the service URLs:
 
 ```
@@ -98,6 +81,9 @@ After deployment completes, `azd` prints the service URLs:
   backend   https://backend.<env>.<region>.azurecontainerapps.io
   agent     https://agent.<env>.<region>.azurecontainerapps.io
 ```
+
+Run `azd env get-values` and record the Application Insights, Log Analytics, and Cosmos DB
+coordinates for the following challenge.
 
 ---
 
@@ -200,16 +186,34 @@ Content-Type: application/json
 
 ```json
 {
-  "role": "assistant",
-  "content": "Observability in distributed systems refers to...",
-  "timestamp": "2024-01-15T10:32:05Z",
-  "usage": {
-    "prompt_tokens": 128,
-    "completion_tokens": 256,
-    "total_tokens": 384
+  "userMessage": {
+    "id": "message-user-123",
+    "conversationId": "conv-abc123",
+    "sessionId": "session-abc123",
+    "role": "user",
+    "content": "Explain observability in distributed systems.",
+    "timestamp": "2024-01-15T10:32:01Z",
+    "status": "accepted"
+  },
+  "assistantMessage": {
+    "id": "message-assistant-456",
+    "conversationId": "conv-abc123",
+    "sessionId": "session-abc123",
+    "role": "assistant",
+    "content": "Observability in distributed systems refers to...",
+    "timestamp": "2024-01-15T10:32:05Z",
+    "model": "gpt-5-mini",
+    "promptTokens": 128,
+    "completionTokens": 256,
+    "totalTokens": 384,
+    "durationMs": 1834.7,
+    "status": "succeeded"
   }
 }
 ```
+
+Both message documents are persisted to the Cosmos DB `interactions` container. The assistant
+document carries the model-usage fields consumed by Fabric Mirroring and downstream agent analytics.
 
 #### Health Check (Backend)
 
@@ -245,17 +249,13 @@ Content-Type: application/json
 
 ```json
 {
-  "message": {
-    "role": "assistant",
-    "content": "Azure Container Apps is a serverless container platform..."
-  },
+  "response": "Azure Container Apps is a serverless container platform...",
   "usage": {
     "prompt_tokens": 64,
-    "completion_tokens": 200,
-    "total_tokens": 264
+    "completion_tokens": 200
   },
-  "model": "gpt-4o",
-  "duration_ms": 1523
+  "model": "gpt-5-mini",
+  "duration_ms": 1412.6
 }
 ```
 
@@ -295,7 +295,7 @@ GET /api/health
 **Response** `200 OK`
 
 ```json
-{ "status": "healthy", "service": "agent", "version": "1.0.0" }
+{ "status": "healthy", "service": "agent" }
 ```
 
 ---
@@ -306,10 +306,11 @@ GET /api/health
 
 | Variable | Description | Required |
 |---|---|---|
-| `COSMOS_ENDPOINT` | Azure Cosmos DB account endpoint URL | Yes |
-| `COSMOS_DATABASE` | Cosmos DB database name (default: `agentsdb`) | Yes |
+| `COSMOS_DB_ENDPOINT` | Azure Cosmos DB account endpoint URL | Yes |
+| `COSMOS_DATABASE` | Cosmos DB database name (default: `agentsdb`) | No |
 | `AGENT_SERVICE_URL` | Internal URL of the agent service | Yes |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Application Insights connection string for telemetry | Yes |
+| `OTEL_SERVICE_NAME` | Application Insights cloud role name (set to `<environment>-backend`) | Yes |
 | `AZURE_CLIENT_ID` | Managed identity client ID for Cosmos DB authentication | Yes |
 | `PORT` | Server port (default: `8000`) | No |
 
@@ -318,9 +319,9 @@ GET /api/health
 | Variable | Description | Required |
 |---|---|---|
 | `AZURE_OPENAI_ENDPOINT` | Azure AI Foundry / OpenAI endpoint URL | Yes |
-| `AZURE_OPENAI_DEPLOYMENT` | Model deployment name (e.g., `gpt-4o`) | Yes |
-| `AZURE_OPENAI_API_VERSION` | API version (default: `2024-06-01`) | No |
+| `AZURE_OPENAI_DEPLOYMENT` | Model deployment name (default: `gpt-5-mini`) | Yes |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Application Insights connection string for telemetry | Yes |
+| `OTEL_SERVICE_NAME` | Application Insights cloud role name (set to `<environment>-agent`) | Yes |
 | `AZURE_CLIENT_ID` | Managed identity client ID for Azure OpenAI authentication | Yes |
 | `PORT` | Server port (default: `8001`) | No |
 
@@ -328,8 +329,7 @@ GET /api/health
 
 | Variable | Description | Required |
 |---|---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | Backend API base URL exposed to the browser | Yes |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Application Insights connection string for telemetry | No |
+| `NEXT_PUBLIC_API_URL` | Backend API base URL resolved by the frontend's runtime `/api/config` route | Yes |
 | `PORT` | Server port (default: `3000`) | No |
 
 ---
@@ -344,7 +344,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 # Set required environment variables
-export COSMOS_ENDPOINT="https://<your-account>.documents.azure.com:443/"
+export COSMOS_DB_ENDPOINT="https://<your-account>.documents.azure.com:443/"
 export COSMOS_DATABASE="agentsdb"
 export AGENT_SERVICE_URL="http://localhost:8001"
 export APPLICATIONINSIGHTS_CONNECTION_STRING="<your-connection-string>"
@@ -361,7 +361,7 @@ pip install -r requirements.txt
 
 # Set required environment variables
 export AZURE_OPENAI_ENDPOINT="https://<your-resource>.openai.azure.com/"
-export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
+export AZURE_OPENAI_DEPLOYMENT="gpt-5-mini"
 export APPLICATIONINSIGHTS_CONNECTION_STRING="<your-connection-string>"
 
 uvicorn app:app --reload --port 8001
@@ -374,7 +374,7 @@ cd src/frontend
 npm install
 
 # Create .env.local
-echo 'NEXT_PUBLIC_API_BASE_URL=http://localhost:8000' > .env.local
+echo 'NEXT_PUBLIC_API_URL=http://localhost:8000' > .env.local
 
 npm run dev
 ```
@@ -387,20 +387,23 @@ The frontend is available at `http://localhost:3000`.
 
 ### Application Insights Integration
 
-All three services emit telemetry through the **Azure Monitor OpenTelemetry SDK**. Traces, metrics, and logs are collected automatically and correlated across service boundaries.
+Application telemetry begins at the backend. The backend and agent use the **Azure Monitor
+OpenTelemetry SDK** for inbound requests, outbound HTTP dependencies, Azure SDK dependencies, and
+custom metrics. The frontend is not instrumented.
 
 #### Distributed Tracing
 
-Every inbound HTTP request generates a trace that flows through the entire call chain:
+Inbound backend requests create trace context that flows through the instrumented service chain:
 
 ```
-Frontend → APIM → Backend → Agent → Azure OpenAI
+Backend → Agent → Azure OpenAI
+  └────────────→ Cosmos DB
 ```
 
-Each span in the trace includes:
+Request and dependency spans include:
 - HTTP method, URL, and status code
 - Duration and dependency details
-- Custom attributes (conversation ID, model name, token counts)
+- Operation and trace correlation identifiers
 
 **View traces:** Azure Portal → Application Insights → Transaction search → filter by operation name.
 
@@ -434,22 +437,31 @@ Monitor real-time request rates, failure rates, and dependency durations during 
 
 #### Log Analytics (KQL)
 
-Query structured logs across all services:
+Confirm named backend and agent requests:
 
 ```kql
-// End-to-end latency for agent invocations
-requests
-| where name == "POST /api/agent/invoke"
-| summarize avg(duration), percentile(duration, 95) by bin(timestamp, 5m)
-| render timechart
+AppRequests
+| where TimeGenerated > ago(30m)
+| project TimeGenerated, AppRoleName, Name, OperationId, ResultCode, Success
+| order by TimeGenerated desc
 ```
 
+Confirm correlated service, model, and Cosmos DB dependencies:
+
 ```kql
-// Token usage over time
-customMetrics
-| where name == "agent.tokens.completion"
-| summarize sum(value) by bin(timestamp, 1h)
-| render columnchart
+AppDependencies
+| where TimeGenerated > ago(30m)
+| project TimeGenerated, AppRoleName, Name, Target, OperationId, ResultCode, Success
+| order by TimeGenerated desc
+```
+
+Confirm token and latency metrics:
+
+```kql
+AppMetrics
+| where TimeGenerated > ago(30m) and Name startswith "agent."
+| summarize Value=sum(Sum) by Name, bin(TimeGenerated, 5m)
+| order by TimeGenerated desc
 ```
 
 ### Cosmos DB Query Metrics
@@ -461,6 +473,9 @@ Cosmos DB request units (RU) and latency are captured as dependency telemetry in
 - Throttled requests (HTTP 429)
 
 ### APIM Analytics Dashboard
+
+APIM is provisioned but is not in the reference application's active request path. Its analytics
+will remain empty until clients are explicitly routed through the APIM gateway.
 
 API Management provides built-in analytics:
 
@@ -479,13 +494,11 @@ The infrastructure is defined in Bicep modules under `infra/`:
 
 | Module | Resources Provisioned |
 |---|---|
-| `main.bicep` | Orchestrates all modules; defines parameters and outputs |
-| `containerApps.bicep` | Container Apps Environment, three Container Apps (frontend, backend, agent), scaling rules, managed identity assignments |
-| `cosmosDb.bicep` | Cosmos DB account (serverless), `agentsdb` database, `conversations` and `interactions` containers with partition keys |
-| `apiManagement.bicep` | APIM instance, API definitions, policies for rate limiting and PTU load balancing, named values |
-| `monitoring.bicep` | Log Analytics workspace, Application Insights instance, diagnostic settings for all resources |
-| `aiFoundry.bicep` | Azure AI Services account, model deployment (GPT-4o), managed identity role assignment |
-| `security.bicep` | User-assigned managed identities, role assignments (Cosmos DB Data Contributor, Cognitive Services OpenAI User) |
+| `main.bicep` | Orchestrates modules; creates Azure AI Services, the `gpt-5-mini` deployment, managed identity, Key Vault, and role assignments |
+| `container-apps.bicep` | ACR, Container Apps Environment, three Container Apps, scaling rules, and ACR pull assignment |
+| `cosmos-db.bicep` | Cosmos DB account (serverless), `agentsdb` database, `conversations` and `interactions` containers with partition keys |
+| `api-management.bicep` | APIM instance, API definitions, and rate-limit/CORS policies for future gateway integration |
+| `monitoring.bicep` | Log Analytics workspace and workspace-based Application Insights instance |
 
 ---
 
