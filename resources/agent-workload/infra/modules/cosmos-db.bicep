@@ -35,7 +35,14 @@ resource cosmosDbAccount 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
     publicNetworkAccess: 'Enabled'
     enableAutomaticFailover: false
     enableMultipleWriteLocations: false
+    // Fabric Mirroring (Challenge 3) requires continuous backup and account-key auth.
     disableLocalAuth: false
+    backupPolicy: {
+      type: 'Continuous'
+      continuousModeProperties: {
+        tier: 'Continuous7Days'
+      }
+    }
   }
 }
 

@@ -55,6 +55,12 @@ For the checkpoint, require the **Load E2E Pipeline**:
 - Parameters: `FromMonth` defaults to `-3`; `ToMonth` defaults to `0`.
 - Policy: notebook activities have retries and dependency conditions.
 
+> ⚠️ **Coach note — the `WebhookUrl` parameter has no backing endpoint.** The pipeline's
+> `Send Failure Notification` web activity POSTs to `WebhookUrl`, whose default is a placeholder. No
+> Bicep or setup script in this repo provisions a Logic App or webhook. Teams must supply their own
+> HTTP-triggered Logic App URL at run time; otherwise the notification activity fails on top of any
+> upstream notebook failure and muddies the diagnosis.
+
 Point out the incremental operating path:
 
 - Pipeline file: [`pipeline_daily_refresh.json`](../resources/fabric-control-tower/fabric/pipelines/pipeline_daily_refresh.json)
@@ -138,6 +144,7 @@ Ask the team to show:
 | Schema drift in raw Parquet breaks Bronze or Silver | Inspect the new columns, update explicit casts/mappings, and keep Bronze raw for replay |
 | Mirrored tables are late-arriving or empty | Check Mirroring status, generate new agent traffic, rerun the Cosmos transform after records arrive |
 | Pipeline dependency ordering changed | Restore Bronze before Silver, Silver before Gold, and include Cosmos transform after Bronze |
+| `Send Failure Notification` activity fails with a DNS or 404 error | The `WebhookUrl` placeholder was left in place. Provision a Logic App / HTTP webhook and pass its URL as the pipeline parameter, or accept that this activity fails and read the upstream notebook error instead |
 | FOCUS normalization edge cases | Validate currency, amortization, service names, and missing cost fields before Gold aggregation |
 | F2 capacity runs slow or hits Spark pressure | Reduce the date window, run notebooks sequentially, and avoid unnecessary full refreshes |
 | Gold query scans too much data | Filter by date/service first; partition or optimize high-traffic Gold tables if time allows |

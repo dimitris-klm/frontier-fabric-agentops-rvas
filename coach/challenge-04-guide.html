@@ -147,6 +147,13 @@ Transform after Bronze.</li>
 <li>Parameters: <code>FromMonth</code> defaults to <code>-3</code>; <code>ToMonth</code> defaults to <code>0</code>.</li>
 <li>Policy: notebook activities have retries and dependency conditions.</li>
 </ul>
+<blockquote>
+<p>⚠️ <strong>Coach note — the <code>WebhookUrl</code> parameter has no backing endpoint.</strong> The pipeline&#39;s
+<code>Send Failure Notification</code> web activity POSTs to <code>WebhookUrl</code>, whose default is a placeholder. No
+Bicep or setup script in this repo provisions a Logic App or webhook. Teams must supply their own
+HTTP-triggered Logic App URL at run time; otherwise the notification activity fails on top of any
+upstream notebook failure and muddies the diagnosis.</p>
+</blockquote>
 <p>Point out the incremental operating path:</p>
 <ul>
 <li>Pipeline file: <a href="../code.html?path=resources%2Ffabric-control-tower%2Ffabric%2Fpipelines%2Fpipeline_daily_refresh.json"><code>pipeline_daily_refresh.json</code></a></li>
@@ -235,6 +242,10 @@ operational telemetry.</li>
 <tr>
 <td>Pipeline dependency ordering changed</td>
 <td>Restore Bronze before Silver, Silver before Gold, and include Cosmos transform after Bronze</td>
+</tr>
+<tr>
+<td><code>Send Failure Notification</code> activity fails with a DNS or 404 error</td>
+<td>The <code>WebhookUrl</code> placeholder was left in place. Provision a Logic App / HTTP webhook and pass its URL as the pipeline parameter, or accept that this activity fails and read the upstream notebook error instead</td>
 </tr>
 <tr>
 <td>FOCUS normalization edge cases</td>
